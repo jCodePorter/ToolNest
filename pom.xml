@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.bytefuture</groupId>
+  <artifactId>toolnest</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>ToolNest</name>
+  <description>ToolNest 工具巢 - 通用效率工具集（JavaFX 桌面端）</description>
+
+  <properties>
+    <!-- 系统是中文 Windows(GBK)，必须显式 UTF-8，否则中文源码乱码 -->
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <maven.compiler.release>21</maven.compiler.release>
+
+    <javafx.version>21.0.12</javafx.version>
+    <atlantafx.version>2.1.0</atlantafx.version>
+    <gson.version>2.11.0</gson.version>
+    <richtextfx.version>0.11.2</richtextfx.version>
+    <zxing.version>3.5.3</zxing.version>
+
+    <main.class>com.bytefuture.toolnest.Launcher</main.class>
+  </properties>
+
+  <dependencies>
+    <!-- JavaFX：不写 classifier，由 Maven 按当前平台自动解析 -->
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-controls</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-graphics</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-base</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+
+    <!-- BufferedImage <-> JavaFX Image 互转：图片处理模块的预览与导出需要 -->
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-swing</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+
+    <!-- 现代主题皮肤 -->
+    <dependency>
+      <groupId>io.github.mkpaz</groupId>
+      <artifactId>atlantafx-base</artifactId>
+      <version>${atlantafx.version}</version>
+    </dependency>
+
+    <!-- JSON 模块使用 -->
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>${gson.version}</version>
+    </dependency>
+
+    <!-- 代码编辑控件，JSON 模块用于语法高亮输出 -->
+    <dependency>
+      <groupId>org.fxmisc.richtext</groupId>
+      <artifactId>richtextfx</artifactId>
+      <version>${richtextfx.version}</version>
+    </dependency>
+
+    <!-- 二维码生成与解析。
+         只引 core：它是纯算法库，运行时零传递依赖（pom 里仅 test 作用域的 junit）。
+         刻意不引 javase —— 那个模块会带进 jcommander 与 jai-imageio-core 两个
+         运行时依赖，而我们只需要它里面的 BufferedImageLuminanceSource，
+         自己写一份只需 40 行，不值得多两个依赖。 -->
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>${zxing.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>toolnest</finalName>
+
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>21</release>
+          <encoding>UTF-8</encoding>
+        </configuration>
+      </plugin>
+
+      <!-- 开发期运行：mvn javafx:run -->
+      <plugin>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-maven-plugin</artifactId>
+        <version>0.0.8</version>
+        <configuration>
+          <mainClass>${main.class}</mainClass>
+          <options>
+            <option>-Dfile.encoding=UTF-8</option>
+            <option>-Duser.language=zh</option>
+          </options>
+        </configuration>
+      </plugin>
+
+      <!-- 打 fat jar，供 jpackage 使用 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <shadedArtifactAttached>false</shadedArtifactAttached>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>${main.class}</mainClass>
+                </transformer>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <!-- 合并多个 jar 时模块描述符冲突，必须排除 -->
+                    <exclude>module-info.class</exclude>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

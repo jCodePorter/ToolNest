@@ -1,0 +1,1210 @@
+/* ============================================================
+   ToolNest 设计系统样式
+   ------------------------------------------------------------
+   重要：JavaFX 的 CSS 不是 Web CSS。
+     · 不支持自定义属性语法（--name: value）与 var() 引用；
+     · 支持的是「被查找的颜色」(looked-up colors)：在 .root 里
+       定义一个带 -fx- 前缀的命名颜色，其他地方直接写这个名字，
+       由 JavaFX 在解析时替换。
+
+   所以本文件的令牌层写成 -dt-* 命名颜色，组件层裸引用它们。
+   注意命名颜色只能承载颜色值，不能承载间距 / 圆角 / 字号，
+   这些必须写成字面量。
+
+   组件层按「外壳 → 侧边栏 → 内容区 → 卡片 → 详情页 → 控件 →
+   HTTP 工具 → 语法高亮」顺序组织，与 DESIGN.md 的章节对应。
+   ============================================================ */
+
+/* ============================================================
+   ① 令牌层：命名颜色
+   ============================================================ */
+
+.root {
+    /* ---------- 画布 / 表面 ---------- */
+    -dt-canvas:          #f6f7f9;  /* 应用最底层：侧边栏所在层 */
+    -dt-surface:         #ffffff;  /* 内容表面：卡片、输入框、表格 */
+    -dt-surface-alt:     #fafbfc;  /* 次级表面：表头、代码区 */
+    -dt-surface-sunken:  #f2f4f7;  /* 下沉表面：悬停态、井底区 */
+    -dt-surface-hover:   #eef0f4;  /* 侧边栏项悬停 */
+
+    /* ---------- 描边 ---------- */
+    -dt-border:          #e3e6eb;
+    -dt-border-strong:   #d2d7de;
+
+    /* ---------- 文字 ---------- */
+    -dt-text:            #16181d;  /* 任务主要内容、标题 */
+    -dt-text-muted:      #5a6169;  /* 次级说明，仍保证可读 */
+    -dt-text-subtle:     #8b929c;  /* 元信息、占位符 */
+    -dt-text-invert:     #ffffff;  /* 强调色块上的文字 */
+
+    /* ---------- 动作 / 焦点 ---------- */
+    -dt-accent:          #2563eb;
+    -dt-accent-hover:    #1d4fd7;
+    -dt-accent-pressed:  #1843bd;
+    -dt-accent-soft:     #eaf0fe;
+    -dt-accent-border:   #b8cdfb;
+
+    /* ---------- 语义状态 ---------- */
+    -dt-success:         #167a4a;
+    -dt-warning:         #a1590a;
+    -dt-danger:          #c33333;
+
+    /* ---------- 语义状态浅底 ---------- */
+    -dt-danger-soft:     #fdf1f1;
+    -dt-warning-soft:    #fdf6ec;
+
+    /* ---------- 交互反馈色（非语义，纯层次） ---------- */
+    -dt-neutral-chip:    #e7eaef;  /* 计数角标底 */
+    -dt-row-alt:         #fcfcfd;  /* 斑马纹 */
+    -dt-row-hover:       #f5f7fa;
+    -dt-selection:       #cfe0fd;  /* 文本选中 */
+    -dt-scrollbar:       #c8ced7;
+    -dt-scrollbar-hover: #aab2be;
+}
+
+/* ============================================================
+   ② 全局基线
+   ============================================================ */
+
+.root {
+    /* 界面字体：Win11 自带 Microsoft YaHei UI，显式指定避免默认字体发虚 */
+    -fx-font-family: "Microsoft YaHei UI", "Microsoft YaHei",
+                     "Segoe UI", "PingFang SC", sans-serif;
+    -fx-font-size: 13px;   /* 界面正文基准 */
+    -fx-background-color: -dt-canvas;
+    -fx-text-fill: -dt-text;
+}
+
+.label {
+    -fx-text-fill: -dt-text;
+}
+
+/* 焦点必须始终可见 —— 键盘用户靠它定位 */
+.text-field:focused,
+.password-field:focused,
+.text-area:focused,
+.combo-box:focused,
+.spinner:focused,
+.check-box:focused > .box,
+.radio-button:focused > .radio {
+    -fx-accent: -dt-accent;
+}
+
+/* 全站统一滚动条：细、低对比、不抢内容 */
+.scroll-bar:vertical,
+.scroll-bar:horizontal {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar:vertical .track,
+.scroll-bar:horizontal .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.scroll-bar:vertical .thumb,
+.scroll-bar:horizontal .thumb {
+    -fx-background-color: -dt-scrollbar;
+    -fx-background-radius: 999px;
+}
+
+.scroll-bar:vertical .thumb:hover,
+.scroll-bar:horizontal .thumb:hover {
+    -fx-background-color: -dt-scrollbar-hover;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+    -fx-shape: " ";
+    -fx-padding: 0;
+}
+
+/* ============================================================
+   ③ 应用外壳
+   ============================================================ */
+
+.main-window {
+    -fx-background-color: -dt-canvas;
+}
+
+.main-split {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.main-split > .split-pane-divider {
+    -fx-padding: 0 1 0 0;
+    -fx-background-color: -dt-border;
+}
+
+/* 批处理页的内部分栏：分隔线更轻，避免和外层分栏混在一起 */
+.batch-split > .split-pane-divider {
+    -fx-padding: 0 1 0 0;
+    -fx-background-color: -dt-border;
+}
+
+/* ============================================================
+   ④ 侧边栏
+   ============================================================ */
+
+.sidebar {
+    -fx-padding: 0;
+    -fx-spacing: 0;
+    -fx-background-color: -dt-canvas;
+}
+
+/* ---------- 品牌区（固定，不随列表滚动） ---------- */
+
+.sidebar-brand-box {
+    -fx-padding: 18 16 14 16;
+    -fx-spacing: 10;
+}
+
+/* 文字标记底托：白字 + 主色方块，是与界面图标区分开的产品标记 */
+.sidebar-logo {
+    -fx-pref-width: 30;
+    -fx-pref-height: 30;
+    -fx-min-width: 30;
+    -fx-min-height: 30;
+    -fx-max-width: 30;
+    -fx-max-height: 30;
+    -fx-background-color: -dt-accent;
+    -fx-background-radius: 8px;
+    -fx-alignment: center;
+}
+
+.sidebar-logo-text {
+    -fx-text-fill: -dt-text-invert;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.sidebar-brand-name {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
+.sidebar-brand-sub {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* ---------- 搜索框 ---------- */
+
+.sidebar-search {
+    -fx-pref-height: 36px;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 6px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1;
+    -fx-padding: 0 10;
+    -fx-prompt-text-fill: -dt-text-subtle;
+}
+
+.sidebar-search:focused {
+    -fx-border-color: -dt-accent;
+}
+
+/* ---------- 「所有工具」入口 ---------- */
+
+.all-tools-button {
+    -fx-background-radius: 6px;
+    -fx-padding: 8 10;
+    -fx-font-size: 13px;
+    -fx-alignment: center-left;
+    -fx-text-fill: -dt-text;
+    -fx-background-color: transparent;
+    -fx-cursor: hand;
+}
+
+.all-tools-button:hover {
+    -fx-background-color: -dt-surface-hover;
+}
+
+/* 选中态是实底主色：全站唯一表示「当前所在位置」的强信号 */
+.all-tools-button.active {
+    -fx-background-color: -dt-accent;
+    -fx-font-weight: bold;
+}
+
+.all-tools-button.active,
+.all-tools-button.active .text {
+    -fx-text-fill: -dt-text-invert;
+    -fx-fill: -dt-text-invert;
+}
+
+/* ---------- 分组小标题 ---------- */
+
+.sidebar-section-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text-subtle;
+    -fx-padding: 0 2 0 2;
+}
+
+.sidebar-head {
+    -fx-padding: 0 16 0 16;
+    -fx-spacing: 10;
+}
+
+/* ---------- 文件夹列表滚动区 ---------- */
+
+.folders-scroll {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.folders-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.folders-scroll > .corner {
+    -fx-background-color: transparent;
+}
+
+.folders-scroll-inner {
+    -fx-padding: 6 12 16 12;
+}
+
+.folders-box {
+    -fx-spacing: 1;
+}
+
+/* ---------- 分类文件夹（TitledPane） ---------- */
+
+.folder-pane {
+    -fx-background-color: transparent;
+}
+
+.folder-pane > .title {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6px;
+    -fx-padding: 7 8;
+    -fx-cursor: hand;
+}
+
+.folder-pane > .title:hover {
+    -fx-background-color: -dt-surface-hover;
+}
+
+.folder-pane > .title > .arrow-button {
+    -fx-padding: 0 0 0 6;
+}
+
+.folder-pane > .title > .arrow-button .arrow {
+    -fx-background-color: -dt-text-subtle;
+}
+
+.folder-pane > *.content {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+}
+
+.folder-icon {
+    -fx-font-size: 13px;
+    -fx-text-fill: -dt-text-muted;
+    -fx-min-width: 18;
+}
+
+.folder-name {
+    -fx-font-size: 13px;
+    -fx-text-fill: -dt-text;
+}
+
+.folder-count {
+    -fx-font-size: 11px;
+    -fx-text-fill: -dt-text-muted;
+    -fx-background-color: -dt-neutral-chip;
+    -fx-background-radius: 999px;
+    -fx-padding: 1 7;
+}
+
+/* ---------- 文件夹内的功能子项 ---------- */
+
+.folder-items {
+    -fx-padding: 1 0 4 0;
+    -fx-spacing: 1;
+}
+
+/* 缩进 + 一条竖线，表达「这些子项属于上面的文件夹」 */
+.folder-items-line {
+    -fx-padding: 0 0 0 14;
+    -fx-border-color: -dt-border;
+    -fx-border-width: 0 0 0 1;
+    -fx-border-insets: 0 0 0 15;
+}
+
+.module-item {
+    -fx-padding: 6 8;
+    -fx-background-radius: 6px;
+    -fx-cursor: hand;
+}
+
+.module-item:hover {
+    -fx-background-color: -dt-surface-hover;
+}
+
+.module-item-icon {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+    -fx-min-width: 16;
+}
+
+.module-item-name {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+/* ============================================================
+   ⑤ 内容区
+   ============================================================ */
+
+.content-pane {
+    -fx-background-color: -dt-surface;
+}
+
+.grid-scroll {
+    -fx-background-color: -dt-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.grid-scroll > .viewport {
+    -fx-background-color: -dt-surface;
+}
+
+.grid-body {
+    -fx-padding: 0 0 34 0;
+}
+
+/* ---------- 内容区页头（宫格页 / 详情页共用一条语法） ---------- */
+
+/* 只用一条底部分隔线分层，页头本身不加底色 —— 白色内容区更透气 */
+.page-header {
+    -fx-padding: 18 26 14 26;
+    -fx-spacing: 6;
+    -fx-background-color: -dt-surface;
+    -fx-border-color: -dt-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.page-header-title-row {
+    -fx-spacing: 10;
+    -fx-alignment: center-left;
+}
+
+.page-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
+/* 标题右侧的计数 / 位置辅助信息，不参与主视觉层级 */
+.page-title-sub {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+.page-desc {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+/* 宫格 / 详情的实际内容容器，左右留白与页头一致 */
+.page-body {
+    -fx-padding: 20 26 8 26;
+    -fx-spacing: 22;
+}
+
+.section-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+.tool-grid {
+    -fx-padding: 0;
+}
+
+/* ============================================================
+   ⑥ 功能卡片
+   ============================================================ */
+
+.tool-card {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 10px;
+    -fx-border-color: -dt-border;
+    -fx-border-radius: 10px;
+    -fx-border-width: 1;
+    -fx-padding: 18 18 16 18;
+    -fx-spacing: 0;
+    -fx-cursor: hand;
+}
+
+/* 悬停只改描边与阴影，不改尺寸 —— 鼠标移过时卡片不跳动 */
+.tool-card:hover {
+    -fx-border-color: -dt-accent-border;
+    -fx-effect: dropshadow(gaussian, rgba(22, 24, 29, 0.09), 14, 0, 0, 4);
+}
+
+.tool-card:pressed {
+    -fx-border-color: -dt-accent;
+    -fx-effect: dropshadow(gaussian, rgba(22, 24, 29, 0.05), 6, 0, 0, 1);
+}
+
+/* ---------- 图标底托 ---------- */
+
+/* Unicode 符号在不同字体下视觉重量差异很大，统一放进主色浅底方块
+   拉齐节奏；刻意不做色轮换色，避免卡片墙变成调色盘 */
+.tool-card-icon-box {
+    -fx-pref-width: 40;
+    -fx-pref-height: 40;
+    -fx-min-width: 40;
+    -fx-min-height: 40;
+    -fx-max-width: 40;
+    -fx-max-height: 40;
+    -fx-background-color: -dt-accent-soft;
+    -fx-background-radius: 12px;
+    -fx-alignment: center;
+}
+
+.tool-card-icon {
+    -fx-font-size: 19px;
+    -fx-text-fill: -dt-accent;
+}
+
+/* ---------- 卡片文字 ---------- */
+
+.tool-card-name {
+    -fx-font-size: 13.5px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+    -fx-line-spacing: 3;
+}
+
+.tool-card-summary {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-muted;
+    -fx-line-spacing: 4;
+}
+
+.tool-card-desc {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+    -fx-line-spacing: 4;
+}
+
+/* 卡片底部的「打开」提示：静止时不可见，悬停时出现 */
+.tool-card-hint {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-accent;
+    -fx-opacity: 0;
+}
+
+.tool-card:hover .tool-card-hint {
+    -fx-opacity: 1;
+}
+
+/* ============================================================
+   ⑦ 详情页
+   ============================================================ */
+
+.detail-wrapper {
+    -fx-background-color: -dt-surface;
+}
+
+/* 详情页页头比宫格页高一档 —— 它要额外携带返回入口与导航路径 */
+.page-header-detail {
+    -fx-padding: 14 26 14 26;
+    -fx-spacing: 7;
+}
+
+.detail-title-row {
+    -fx-spacing: 12;
+    -fx-alignment: center-left;
+}
+
+.breadcrumb {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+.breadcrumb-sep {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+.breadcrumb-current {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+/* 返回：有描边的次级按钮，键盘可达（可 Tab 聚焦 + Enter 触发） */
+.back-button {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 6px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1;
+    -fx-font-size: 12.5px;
+    -fx-padding: 5 12;
+    -fx-cursor: hand;
+    -fx-text-fill: -dt-text;
+}
+
+.back-button:hover {
+    -fx-background-color: -dt-surface-sunken;
+    -fx-border-color: -dt-text-subtle;
+}
+
+/* 详情页标题：全站最大字级，一屏只有一处 */
+.detail-title {
+    -fx-font-size: 23px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
+/* ============================================================
+   ⑧ 功能页内部构件
+   ============================================================ */
+
+.module-body {
+    -fx-padding: 20 26 24 26;
+}
+
+.module-desc {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+/* ---------- 区块：白底 + 1px 描边 + 内凹头带 ---------- */
+
+.card {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 10px;
+    -fx-border-color: -dt-border;
+    -fx-border-radius: 10px;
+    -fx-border-width: 1;
+    -fx-padding: 16;
+    -fx-spacing: 12;
+}
+
+.card-head {
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
+    -fx-padding: 0 0 12 0;
+    -fx-border-color: -dt-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.card-head-title {
+    -fx-font-size: 13.5px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
+.card-head-note {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* 编号步骤标题（批处理 ①②③④ 用） */
+.section-label {
+    -fx-font-size: 13.5px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
+/* ---------- 字段 ---------- */
+
+.field-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+.field-row {
+    -fx-spacing: 12;
+    -fx-alignment: center-left;
+}
+
+/* ---------- 结果值 ---------- */
+
+.result-value {
+    -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
+    -fx-font-size: 13.5px;
+    -fx-text-fill: -dt-text;
+}
+
+.caption {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* ---------- 状态提示：文字 + 符号，不单靠颜色 ---------- */
+
+.error-text {
+    -fx-text-fill: -dt-danger;
+    -fx-font-size: 12.5px;
+}
+
+.hint-text {
+    -fx-text-fill: -dt-warning;
+    -fx-font-size: 12.5px;
+}
+
+.success-text {
+    -fx-text-fill: -dt-success;
+    -fx-font-size: 12.5px;
+}
+
+/* 跨行提示条：左侧 3px 语义色 + 浅底 + 符号 */
+.notice {
+    -fx-padding: 8 12;
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-width: 0 0 0 3;
+}
+
+.notice-error {
+    -fx-background-color: -dt-danger-soft;
+    -fx-border-color: -dt-danger;
+}
+
+.notice-warning {
+    -fx-background-color: -dt-warning-soft;
+    -fx-border-color: -dt-warning;
+}
+
+.notice-info {
+    -fx-background-color: -dt-accent-soft;
+    -fx-border-color: -dt-accent;
+}
+
+/* ---------- 文本域 / 代码区 ---------- */
+
+.mono-area {
+    -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
+    -fx-font-size: 12.5px;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 8px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1;
+}
+
+.mono-area:focused {
+    -fx-border-color: -dt-accent;
+}
+
+/* TextArea 内部容器默认自带白底，会盖掉外层圆角 */
+.mono-area .content {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8px;
+}
+
+/* ---------- 图片预览 / 参数区（图片处理模块） ---------- */
+
+/* 预览容器：棋盘格底纹暗示透明区域，内容居中 */
+.image-preview-holder {
+    -fx-background-color: -dt-surface-sunken;
+    -fx-background-radius: 10px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 10px;
+    -fx-border-width: 1;
+    -fx-padding: 14;
+    -fx-alignment: center;
+}
+
+/* 拖拽悬停时高亮，提示可释放 */
+.image-preview-holder:drag-over {
+    -fx-border-color: -dt-accent;
+    -fx-background-color: -dt-accent-soft;
+}
+
+/* 右侧参数滚动区：去掉默认描边，融入面板 */
+.image-param-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-padding: 0;
+}
+
+.image-param-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* 参数区分组标题 */
+.image-param-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text-muted;
+}
+
+/* 图片信息（尺寸 / 格式 / 体积）等宽数值 */
+.image-meta {
+    -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* ============================================================
+   ⑨ 表单控件
+   ============================================================ */
+
+.text-field,
+.password-field {
+    -fx-pref-height: 32px;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 6px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1;
+    -fx-padding: 0 10;
+    -fx-prompt-text-fill: -dt-text-subtle;
+    -fx-text-fill: -dt-text;
+}
+
+.text-field:focused,
+.password-field:focused {
+    -fx-border-color: -dt-accent;
+}
+
+.button {
+    -fx-pref-height: 32px;
+    -fx-padding: 0 14;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-font-size: 12.5px;
+    -fx-cursor: hand;
+}
+
+/* 主轴按钮：一屏只允许一处主色实底（该功能页的主操作） */
+.button-primary {
+    -fx-background-color: -dt-accent;
+    -fx-text-fill: -dt-text-invert;
+    -fx-font-weight: bold;
+}
+
+.button-primary:hover {
+    -fx-background-color: -dt-accent-hover;
+}
+
+.button-primary:pressed {
+    -fx-background-color: -dt-accent-pressed;
+}
+
+.button-primary:disabled {
+    -fx-opacity: 0.5;
+}
+
+.combo-box {
+    -fx-pref-height: 32px;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 6px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1;
+}
+
+.combo-box:focused {
+    -fx-border-color: -dt-accent;
+}
+
+.combo-box .list-cell {
+    -fx-text-fill: -dt-text;
+}
+
+.spinner {
+    -fx-pref-height: 32px;
+}
+
+.separator .line {
+    -fx-border-color: -dt-border;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* ============================================================
+   ⑩ HTTP 工具
+   ============================================================ */
+
+.http-panel {
+    -fx-padding: 0;
+}
+
+/* 请求地址栏：整页最重的一条横带，紧贴功能标题下方 */
+.http-url {
+    -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
+    -fx-font-size: 12.5px;
+    -fx-pref-height: 36px;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 6px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1;
+    -fx-padding: 0 12;
+}
+
+.http-url:focused {
+    -fx-border-color: -dt-accent;
+}
+
+/* 方法下拉：等宽字体让 GET / POST / DELETE 左边缘对齐 */
+.http-method {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12.5px;
+    -fx-font-weight: bold;
+    -fx-pref-height: 36px;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+}
+
+/* 发送 / 执行：全页唯一主操作 */
+.http-send {
+    -fx-background-color: -dt-accent;
+    -fx-text-fill: -dt-text-invert;
+    -fx-font-weight: bold;
+    -fx-pref-height: 36px;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-cursor: hand;
+}
+
+.http-send:hover {
+    -fx-background-color: -dt-accent-hover;
+}
+
+.http-send:pressed {
+    -fx-background-color: -dt-accent-pressed;
+}
+
+.http-send:disabled {
+    -fx-opacity: 0.5;
+}
+
+.http-hint-row {
+    -fx-padding: 0;
+}
+
+/* ---------- TabPane：下划线表示当前位置，不用整块方框 ---------- */
+
+.tab-pane {
+    -fx-tab-min-height: 30;
+    -fx-background-color: transparent;
+}
+
+.tab-pane > .tab-header-area {
+    -fx-padding: 0;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: transparent;
+    -fx-border-color: -dt-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-width: 0 0 2 0;
+    -fx-border-color: transparent;
+    -fx-padding: 5 14;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: -dt-surface-sunken;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: transparent;
+    -fx-border-color: -dt-accent;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab .tab-label {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-accent;
+}
+
+.tab-pane > .tab-content-area {
+    -fx-background-color: transparent;
+    -fx-padding: 14 0 0 0;
+}
+
+/* Tab 的焦点环默认画在整个 header 上，视觉很吵，改到文字下划线 */
+.tab-pane > .tab-header-area > .headers-region > .tab:focused {
+    -fx-faint-focus-color: transparent;
+    -fx-focus-color: transparent;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:focused .tab-label {
+    -fx-underline: true;
+}
+
+/* ---------- 键值对表格 ---------- */
+
+.kv-table {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-color: -dt-border;
+    -fx-border-width: 1;
+    -fx-padding: 1;
+}
+
+/* ---------- 结果表 / 预览表（无 class 的 TableView 也统一） ---------- */
+
+.table-view {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-color: -dt-border;
+    -fx-border-width: 1;
+    -fx-padding: 1;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: -dt-surface-alt;
+}
+
+.table-view .column-header {
+    -fx-background-color: transparent;
+    -fx-border-color: -dt-border;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 7 10;
+}
+
+.table-view .column-header .label {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text-subtle;
+    -fx-alignment: center-left;
+}
+
+.table-view .filler {
+    -fx-background-color: transparent;
+}
+
+.table-view .table-row-cell {
+    -fx-cell-size: 34px;
+    -fx-background-color: transparent;
+}
+
+.table-view .table-row-cell:odd {
+    -fx-background-color: -dt-row-alt;
+}
+
+.table-view .table-row-cell:hover {
+    -fx-background-color: -dt-row-hover;
+}
+
+.table-view .table-row-cell:selected {
+    -fx-background-color: -dt-accent-soft;
+}
+
+.table-view .table-cell {
+    -fx-padding: 2 10;
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text;
+    -fx-border-color: transparent;
+}
+
+/* 表格内联编辑框：比行高矮，不撑高行 */
+.table-view .table-cell .text-field {
+    -fx-pref-height: 26px;
+    -fx-border-color: transparent;
+    -fx-background-color: transparent;
+    -fx-padding: 0 6;
+}
+
+.table-view .table-cell .text-field:focused {
+    -fx-border-color: -dt-accent;
+    -fx-background-color: -dt-surface;
+}
+
+.table-view .placeholder .label {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* ---------- 响应状态条 ---------- */
+
+.http-response-bar {
+    -fx-padding: 8 12;
+    -fx-background-color: -dt-surface-alt;
+    -fx-background-radius: 8px;
+    -fx-border-color: -dt-border;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1;
+}
+
+/* Body 标签页顶部小工具条：左侧提示 + 右侧「格式化」按钮 */
+.http-body-toolbar {
+    -fx-padding: 2 0 8 0;
+}
+
+/* ---------- 二维码模块 ---------- */
+
+/* 生成 / 解析两个页签：给内容留出呼吸空间 */
+.qr-tabs {
+    -fx-tab-min-width: 108px;
+}
+
+.qr-tabs .tab-content-area {
+    -fx-padding: 14 0 0 0;
+}
+
+/* 识别结果区：等宽字体便于核对网址与转义字符 */
+.qr-result {
+    -fx-font-size: 13px;
+}
+
+.http-status {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 13.5px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
+.http-metric {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+/* 状态码配色：颜色之外始终有文字（2xx/4xx/5xx 与「失败」字样） */
+.status-ok {
+    -fx-text-fill: -dt-success;
+}
+
+.status-fail,
+.status-error {
+    -fx-text-fill: -dt-danger;
+}
+
+.status-redirect {
+    -fx-text-fill: -dt-warning;
+}
+
+/* ---------- 批处理结果行 ---------- */
+
+.row-ok .table-cell {
+    -fx-text-fill: -dt-success;
+}
+
+.row-fail .table-cell {
+    -fx-text-fill: -dt-danger;
+}
+
+.row-pending .table-cell {
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* ---------- 进度条 ---------- */
+
+.progress-bar {
+    -fx-pref-height: 6px;
+}
+
+.progress-bar > .track {
+    -fx-background-color: -dt-neutral-chip;
+    -fx-background-radius: 999px;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: -dt-accent;
+    -fx-background-radius: 999px;
+    -fx-background-insets: 0;
+    -fx-padding: 3;
+}
+
+/* ============================================================
+   ⑪ JSON 语法高亮（RichTextFX CodeArea）
+   ============================================================ */
+
+.json-code-area {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12.5px;
+    -fx-background-color: -dt-surface;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-width: 1;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+}
+
+/* CodeArea 的内层容器默认不透明白底，会盖住圆角与描边 */
+.json-code-area .content {
+    -fx-background-color: transparent;
+}
+
+.json-code-area .text {
+    -fx-fill: -dt-text;
+}
+
+/*
+  行号栏：RichTextFX 把行号塞在段落图形里，容器只有 8px 内边距，
+  数字一长就会顶到分隔线上。给它一个固定宽度 + 右对齐，
+  数字位数变化时列宽不抖，也和代码之间留出稳定间距。
+*/
+.json-code-area .lineno {
+    -fx-background-color: -dt-surface-alt;
+    -fx-text-fill: -dt-text-subtle;
+    -fx-font-size: 12px;
+    -fx-padding: 0 12 0 8;
+    -fx-border-color: -dt-border;
+    -fx-border-width: 0 1 0 0;
+    -fx-alignment: center-right;
+}
+
+.json-code-area .selection {
+    -fx-fill: -dt-selection;
+}
+
+.json-code-area .caret {
+    -fx-stroke: -dt-text;
+}
+
+/* 语法着色 —— 与 JsonCodeArea 中的样式类名严格对应。
+   键名与关键字额外加粗，颜色之外再给一重区分，降低色觉障碍风险 */
+.json-key {
+    -fx-fill: #0b4fa8;
+    -fx-font-weight: bold;
+}
+
+.json-string {
+    -fx-fill: #15704f;
+}
+
+.json-number {
+    -fx-fill: #a34a00;
+}
+
+.json-keyword {
+    -fx-fill: #7a24a3;
+    -fx-font-weight: bold;
+}
+
+.json-punct {
+    -fx-fill: #4a515b;
+}
+
+.json-placeholder {
+    -fx-text-fill: -dt-text-subtle;
+    -fx-font-size: 12.5px;
+    -fx-padding: 2 0 0 6;
+}

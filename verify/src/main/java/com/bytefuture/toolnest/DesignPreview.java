@@ -1,0 +1,150 @@
+package com.bytefuture.toolnest;
+
+import com.bytefuture.toolnest.core.ModuleCategory;
+import com.bytefuture.toolnest.core.ToolRegistry;
+import com.bytefuture.toolnest.modules.http.HttpToolModule;
+import com.bytefuture.toolnest.modules.json.JsonFormatModule;
+import com.bytefuture.toolnest.modules.timestamp.TimestampModule;
+import com.bytefuture.toolnest.ui.MainWindow;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.embed.swing.SwingFXUtils;
+import javafx.scene.Scene;
+import javafx.scene.image.WritableImage;
+import javafx.stage.Stage;
+import atlantafx.base.theme.PrimerLight;
+
+import javax.imageio.ImageIO;
+import java.io.File;
+
+/**
+ * 设计验收用的离屏渲染器（不参与打包产物，仅用于生成视觉评审截图）。
+ *
+ * <p>以真实主题、真实样式表、真实窗口尺寸构建界面，把若干状态分别渲染成 PNG，
+ * 供人眼检查层级、间距、对齐与配色 —— 比只读 CSS 更接近真实效果。
+ *
+ * <p>用法：{@code java -cp <fat-jar> com.bytefuture.toolnest.DesignPreview [输出目录]}
+ */
+public class DesignPreview {
+
+    private static final double WIDTH = 1280;
+    private static final double HEIGHT = 800;
+
+    private static File outDir = new File("build/ui-preview");
+
+    /**
+     * 入口放在普通类里，而不是继承 {@link Application}。
+     *
+     * <p>JavaFX 会检查主类是否为 {@code Application} 子类；若直接以它启动，
+     * 在 classpath 模式（无 module-path）下会报「缺少 JavaFX 运行时组件」。
+     * 因此与产品入口 {@code Launcher} 一样，用一个普通类转交。
+     */
+    public static void main(String[] args) {
+        if (args.length > 0) {
+            outDir = new File(args[0]);
+        }
+        Application.launch(PreviewApp.class, args);
+    }
+
+    /** 实际的渲染流程。 */
+    public static class PreviewApp extends Application {
+
+    @Override
+    public void start(Stage stage) throws Exception {
+        setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+        ToolRegistry.bootstrap();
+        outDir.mkdirs();
+        System.out.println("[preview] outDir=" + outDir.getAbsolutePath());
+
+        MainWindow root = new MainWindow();
+        Scene scene = new Scene(root, WIDTH, HEIGHT);
+        scene.getStylesheets().add(
+                DesignPreview.class.getResource("/css/app.css").toExternalForm());
+
+        stage.setScene(scene);
+        stage.setWidth(WIDTH);
+        stage.setHeight(HEIGHT);
+        stage.show();
+        System.out.println("[preview] window shown");
+
+        // 不用等待动画帧（无头环境下动画脉冲不可靠），
+        // 直接对根节点做一次强制布局，让所有尺寸落定后再截图
+        forceLayout(root);
+        shoot(scene, "01-grid.png");
+
+        // 详情页：时间戳转换
+        jump(root, "timestamp");
+        forceLayout(root);
+        shoot(scene, "02-detail-timestamp.png");
+
+        // 详情页：JSON 格式化（左右分栏 + 语法高亮）
+        jump(root, "json-format");
+        forceLayout(root);
+        fillJsonDemo(scene);
+        shoot(scene, "03-detail-json.png");
+
+        // 详情页：HTTP 单一请求（最复杂的界面）
+        jump(root, "http");
+        forceLayout(root);
+        shoot(scene, "04-detail-http.png");
+
+        // 某分类宫格
+        root.openCategory(ModuleCategory.CONVERT);
+        forceLayout(root);
+        shoot(scene, "05-grid-convert.png");
+
+        System.out.println("[preview] all shots done");
+        System.out.flush();
+        Platform.exit();
+    }
+
+    private void jump(MainWindow window, String moduleId) {
+        window.openModule(moduleId);
+    }
+
+    /**
+     * 强制完成一次完整布局。
+     *
+     * <p>{@code applyCss} 解析样式表并计算样式类；{@code layout} 让所有
+     * Region 按当前尺寸摆放子节点。这样无需等待 FX 的动画脉冲，在无头 /
+     * 无显示器环境里也能得到稳定的渲染结果。
+     */
+    private void forceLayout(javafx.scene.Parent root) {
+        root.applyCss();
+        root.layout();
+    }
+
+    /**
+     * 往 JSON 页填入示例内容。
+     *
+     * <p>空界面截图无法验证语法高亮配色、长行折行与行号栏对齐 ——
+     * 这几项恰恰是设计系统里最容易出问题的部分，所以评审截图必须带真实数据。
+     * 截图用的示例数据仅用于视觉评审，不是产品功能的一部分。
+     */
+    private void fillJsonDemo(Scene scene) {
+        String sample = """
+                {"orderId":"235027703726","type":"A","channel":"web",""" 
+                + """
+                "amount":1299.00,"paid":true,"items":[{"sku":"SKU-001","qty":2}]}""";
+
+        // 输入区：场景里唯一的可编辑文本区
+        for (javafx.scene.Node node : scene.getRoot().lookupAll(".text-area")) {
+            if (node instanceof javafx.scene.control.TextArea area && area.isEditable()) {
+                area.setText(sample);
+                return;
+            }
+        }
+        System.out.println("[preview] warning: 未找到 JSON 输入区，截图将为空状态");
+    }
+
+    private void shoot(Scene scene, String name) throws Exception {
+        System.out.println("[preview] snapshot " + name + " ...");
+        WritableImage image = scene.snapshot(null);
+        File file = new File(outDir, name);
+        ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", file);
+        System.out.println("[preview] wrote " + file.getName()
+                + "  (" + (int) image.getWidth() + "x" + (int) image.getHeight() + ")");
+        System.out.flush();
+    }
+    }
+}

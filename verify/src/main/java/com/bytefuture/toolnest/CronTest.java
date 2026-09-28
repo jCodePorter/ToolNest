@@ -1,7 +1,9 @@
 package com.bytefuture.toolnest;
 
-import com.bytefuture.toolnest.modules.cron.CronExpression;
+import com.bytefuture.toolnest.features.cron.CronExpression;
+import com.bytefuture.toolnest.features.cron.CronModule;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -162,8 +164,61 @@ public final class CronTest {
             check("中文描述生成成功", false, "抛异常：" + ex.getMessage());
         }
 
+        // ---------- 等待时长文案 ----------
+        expectDuration("30 秒", Duration.ofSeconds(30), "30 秒");
+        expectDuration("90 秒", Duration.ofSeconds(90), "1 分钟 30 秒");
+        expectDuration("5 分钟整", Duration.ofMinutes(5), "5 分钟");
+        expectDuration("2 小时整", Duration.ofHours(2), "2 小时");
+        expectDuration("3 天整", Duration.ofDays(3), "3 天");
+        expectDuration("1 天 6 小时", Duration.ofHours(30), "1 天 6 小时");
+
+        // ---------- 未来执行时间列表渲染（界面只是它的薄壳） ----------
+        try {
+            LocalDateTime now = LocalDateTime.of(2026, 9, 27, 17, 57, 0);
+            List<LocalDateTime> list = CronExpression.parse("0 0 * * *").nextList(now, 3);
+            String text = CronModule.buildNextText(list, now);
+            String[] lines = text.split("\n");
+
+            check("列表首行 = 2026-09-28 00:00:00 周一",
+                    lines.length == 3 && lines[0].startsWith(" 1. 2026-09-28 00:00:00  周一"),
+                    lines.length > 0 ? lines[0] : "空");
+            check("首行也标注等待时长（+6 小时 3 分）",
+                    lines.length > 0 && lines[0].contains("(+6 小时 3 分)"),
+                    lines.length > 0 ? lines[0] : "空");
+            check("次行为距现在的 1 天 6 小时，而非与上次的间隔 +1 天",
+                    lines.length > 1 && lines[1].contains("(+1 天 6 小时)"),
+                    lines.length > 1 ? lines[1] : "空");
+            check("等待时长逐行递增",
+                    lines.length == 3 && lines[0].contains("6 小时")
+                            && lines[1].contains("1 天") && lines[2].contains("2 天"),
+                    java.util.Arrays.toString(lines));
+        } catch (Exception ex) {
+            check("未来执行时间列表渲染", false, "抛异常：" + ex.getMessage());
+        }
+
+        // 秒级表达式：间隔不足 1 分钟时不能退化成「+0 分钟」
+        try {
+            LocalDateTime now = LocalDateTime.of(2026, 9, 27, 17, 57, 0);
+            List<LocalDateTime> list = CronExpression.parse("*/30 * * * * *").nextList(now, 2);
+            String text = CronModule.buildNextText(list, now);
+            String[] lines = text.split("\n");
+            check("30 秒表达式首行显示 +30 秒",
+                    lines.length == 2 && lines[0].contains("(+30 秒)"),
+                    lines.length > 0 ? lines[0] : "空");
+            check("30 秒表达式次行显示 +1 分钟",
+                    lines.length == 2 && lines[1].contains("(+1 分钟)"),
+                    lines.length > 1 ? lines[1] : "空");
+        } catch (Exception ex) {
+            check("秒级表达式等待时长", false, "抛异常：" + ex.getMessage());
+        }
+
         System.out.println();
         System.out.println("RESULT passed=" + passed + " failed=" + failed);
         System.exit(failed == 0 ? 0 : 1);
+    }
+
+    private static void expectDuration(String name, Duration d, String expected) {
+        String actual = CronModule.humanDuration(d);
+        check("等待时长文案 " + name, expected.equals(actual), "期望 " + expected + " 实际 " + actual);
     }
 }

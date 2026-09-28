@@ -1,9 +1,9 @@
 package com.bytefuture.toolnest;
 
 import com.bytefuture.toolnest.core.ModuleCategory;
-import com.bytefuture.toolnest.core.ToolModule;
-import com.bytefuture.toolnest.core.ToolRegistry;
-import com.bytefuture.toolnest.ui.ContentPane;
+import com.bytefuture.toolnest.ui.spi.ToolModule;
+import com.bytefuture.toolnest.app.ToolRegistry;
+import com.bytefuture.toolnest.ui.shell.ContentPane;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
@@ -56,6 +56,14 @@ public class SmokeTest extends Application {
     public void start(Stage stage) {
         ToolRegistry.bootstrap();
         OUT_DIR.mkdirs();
+
+        // 与产品保持一致的主题。
+        // 少了这一行，探针用的是 JavaFX 内置的 modena，而产品跑的是
+        // AtlantaFX PrimerLight —— 两者的控件默认样式差别很大
+        // （最明显的是 CheckBox 的文字：modena 下取 ladder(-fx-background…)
+        //  算出的色，在我们覆写过 .root 之后会算成浅色，肉眼看上去
+        //  「复选框没有文字」）。截图是给设计评审看的，必须先与产品同源。
+        setUserAgentStylesheet(new atlantafx.base.theme.PrimerLight().getUserAgentStylesheet());
 
         // 捕获 CSS 解析错误：JavaFX 通过未捕获异常处理器上报 CSS 问题
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {

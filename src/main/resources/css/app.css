@@ -20,16 +20,21 @@
    ============================================================ */
 
 .root {
-    /* ---------- 画布 / 表面 ---------- */
-    -dt-canvas:          #f6f7f9;  /* 应用最底层：侧边栏所在层 */
+    /* ---------- 画布 / 表面 ----------
+       三层结构：画布（侧边栏） < 内容底 < 表面（卡片、输入框、表格）。
+       内容底这一层是重设计新增的。在此之前内容区与卡片同为纯白，
+       卡片只能靠 1px 描边区分，整页看起来像「白纸上的几个框」。 */
+    -dt-canvas:          #f2f4f7;  /* 侧边栏所在层，最底 */
+    -dt-content-bg:      #f8f9fb;  /* 内容区底：让白卡片浮起来的那一层 */
     -dt-surface:         #ffffff;  /* 内容表面：卡片、输入框、表格 */
     -dt-surface-alt:     #fafbfc;  /* 次级表面：表头、代码区 */
     -dt-surface-sunken:  #f2f4f7;  /* 下沉表面：悬停态、井底区 */
-    -dt-surface-hover:   #eef0f4;  /* 侧边栏项悬停 */
+    -dt-surface-hover:   #e8ecf2;  /* 侧边栏项 / 列表行悬停 */
 
     /* ---------- 描边 ---------- */
-    -dt-border:          #e3e6eb;
-    -dt-border-strong:   #d2d7de;
+    -dt-border:          #e6eaef;  /* 常规分隔、卡片与表格外框 */
+    -dt-border-faint:    #f0f3f7;  /* 更轻：卡内分组线、表格行分隔 */
+    -dt-border-strong:   #d2d7de;  /* 输入框等需要被识别的边界 */
 
     /* ---------- 文字 ---------- */
     -dt-text:            #16181d;  /* 任务主要内容、标题 */
@@ -52,14 +57,22 @@
     /* ---------- 语义状态浅底 ---------- */
     -dt-danger-soft:     #fdf1f1;
     -dt-warning-soft:    #fdf6ec;
+    -dt-danger-border:   #f0c4c4;  /* 破坏性动作按钮的描边 */
+
+    /* ---------- 分段控件（外层业务页签） ----------
+       与外层「下划线」页签形成形态上的主从区分：外层是容器 + 滑块，
+       内层是文字 + 下划线。见 app.css 页签一节。 */
+    -dt-segmented-track: #eef1f5;
+    -dt-segmented-thumb: #ffffff;
+    -dt-segmented-edge:  #dfe4ea;
 
     /* ---------- 交互反馈色（非语义，纯层次） ---------- */
     -dt-neutral-chip:    #e7eaef;  /* 计数角标底 */
     -dt-row-alt:         #fcfcfd;  /* 斑马纹 */
     -dt-row-hover:       #f5f7fa;
     -dt-selection:       #cfe0fd;  /* 文本选中 */
-    -dt-scrollbar:       #c8ced7;
-    -dt-scrollbar-hover: #aab2be;
+    -dt-scrollbar:       #b3bac4;   /* 与 #f8f9fb 底对比度约 2.2:1 */
+    -dt-scrollbar-hover: #8b929c;   /* 悬停加深到约 3:1 */
 }
 
 /* ============================================================
@@ -79,6 +92,41 @@
     -fx-text-fill: -dt-text;
 }
 
+/* ---------- 线性图标 ----------
+   图标是 SVGPath（见 ui/Icons.java），路径数据不带色值，
+   描边一律由这里的令牌决定。JPEG 换主题或调令牌时图标会跟着走。 */
+.icon {
+    -fx-stroke: -dt-text-muted;
+}
+
+.icon-accent {
+    -fx-stroke: -dt-accent;
+}
+
+.icon-muted {
+    -fx-stroke: -dt-text-muted;
+}
+
+.icon-subtle {
+    -fx-stroke: -dt-text-subtle;
+}
+
+.icon-invert {
+    -fx-stroke: -dt-text-invert;
+}
+
+.icon-danger {
+    -fx-stroke: -dt-danger;
+}
+
+.icon-warning {
+    -fx-stroke: -dt-warning;
+}
+
+.icon-success {
+    -fx-stroke: -dt-success;
+}
+
 /* 焦点必须始终可见 —— 键盘用户靠它定位 */
 .text-field:focused,
 .password-field:focused,
@@ -94,6 +142,21 @@
 .scroll-bar:vertical,
 .scroll-bar:horizontal {
     -fx-background-color: transparent;
+    /* 底部主题给滚动条叠了一层整体不透明度，实测 thumb 渲染成 #e0e4e9 ——
+       在 #f8f9fb 的内容底上几乎看不见，用户不知道这页还能往下滚。
+       显式拉回 1.0，颜色由令牌负责。 */
+    -fx-opacity: 1;
+    -fx-background-insets: 0;
+}
+
+.scroll-bar:vertical {
+    -fx-pref-width: 11px;
+    -fx-padding: 3 3 3 0;
+}
+
+.scroll-bar:horizontal {
+    -fx-pref-height: 11px;
+    -fx-padding: 0 3 3 3;
 }
 
 .scroll-bar:vertical .track,
@@ -106,6 +169,8 @@
 .scroll-bar:horizontal .thumb {
     -fx-background-color: -dt-scrollbar;
     -fx-background-radius: 999px;
+    -fx-opacity: 1;
+    -fx-background-insets: 0;
 }
 
 .scroll-bar:vertical .thumb:hover,
@@ -144,10 +209,42 @@
     -fx-background-color: -dt-border;
 }
 
+/* 分栏的分隔条与拖拽把手。
+   底主题会在分隔条正中画一段约 20px 高的深色把手，静止时就杵在那里 ——
+   比它要表达的「这里可以拖」抢眼得多，还容易被误认成渲染残渣。
+   改成：静止时只有一条 1px 细线，把手透明；悬停到分隔条上才显形。 */
+.split-pane {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-padding: 0 1 0 1;
+    -fx-background-color: -dt-border;
+    -fx-background-insets: 0;
+}
+
+.split-pane:vertical > .split-pane-divider {
+    -fx-padding: 1 0 1 0;
+}
+
+.split-pane > .split-pane-divider > .horizontal-grabber,
+.split-pane > .split-pane-divider > .vertical-grabber {
+    -fx-padding: 3;
+    -fx-background-color: transparent;
+}
+
+.split-pane > .split-pane-divider:hover > .horizontal-grabber,
+.split-pane > .split-pane-divider:hover > .vertical-grabber {
+    -fx-background-color: -dt-border-strong;
+    -fx-background-radius: 2px;
+}
+
 /* 批处理页的内部分栏：分隔线更轻，避免和外层分栏混在一起 */
 .batch-split > .split-pane-divider {
     -fx-padding: 0 1 0 0;
-    -fx-background-color: -dt-border;
+    -fx-background-color: -dt-border-faint;
 }
 
 /* ============================================================
@@ -163,50 +260,46 @@
 /* ---------- 品牌区（固定，不随列表滚动） ---------- */
 
 .sidebar-brand-box {
-    -fx-padding: 18 16 14 16;
+    -fx-padding: 18 18 16 18;
     -fx-spacing: 10;
 }
 
 /* 文字标记底托：白字 + 主色方块，是与界面图标区分开的产品标记 */
 .sidebar-logo {
-    -fx-pref-width: 30;
-    -fx-pref-height: 30;
-    -fx-min-width: 30;
-    -fx-min-height: 30;
-    -fx-max-width: 30;
-    -fx-max-height: 30;
+    -fx-pref-width: 32;
+    -fx-pref-height: 32;
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+    -fx-max-width: 32;
+    -fx-max-height: 32;
     -fx-background-color: -dt-accent;
-    -fx-background-radius: 8px;
+    -fx-background-radius: 9px;
     -fx-alignment: center;
 }
 
-.sidebar-logo-text {
-    -fx-text-fill: -dt-text-invert;
-    -fx-font-size: 15px;
-    -fx-font-weight: bold;
-}
-
 .sidebar-brand-name {
-    -fx-font-size: 17px;
+    -fx-font-size: 16px;
     -fx-font-weight: bold;
     -fx-text-fill: -dt-text;
 }
 
 .sidebar-brand-sub {
-    -fx-font-size: 12px;
+    -fx-font-size: 11px;
     -fx-text-fill: -dt-text-subtle;
 }
 
 /* ---------- 搜索框 ---------- */
 
+/* 左内边距 34 给叠在左侧的放大镜图标让位（见 Sidebar 里的 StackPane） */
 .sidebar-search {
     -fx-pref-height: 36px;
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 6px;
-    -fx-border-color: -dt-border-strong;
-    -fx-border-radius: 6px;
+    -fx-background-radius: 8px;
+    -fx-border-color: -dt-segmented-edge;
+    -fx-border-radius: 8px;
     -fx-border-width: 1;
-    -fx-padding: 0 10;
+    -fx-font-size: 12.5px;
+    -fx-padding: 0 12 0 34;
     -fx-prompt-text-fill: -dt-text-subtle;
 }
 
@@ -217,42 +310,68 @@
 /* ---------- 「所有工具」入口 ---------- */
 
 .all-tools-button {
-    -fx-background-radius: 6px;
-    -fx-padding: 8 10;
-    -fx-font-size: 13px;
+    -fx-background-radius: 8px;
+    -fx-padding: 0 10 0 7;
+    -fx-pref-height: 36px;
     -fx-alignment: center-left;
-    -fx-text-fill: -dt-text;
     -fx-background-color: transparent;
     -fx-cursor: hand;
+}
+
+.all-tools-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: -dt-text;
+}
+
+.all-tools-count {
+    -fx-font-size: 11px;
+    -fx-text-fill: -dt-text-muted;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 999px;
+    -fx-padding: 1 7;
 }
 
 .all-tools-button:hover {
     -fx-background-color: -dt-surface-hover;
 }
 
-/* 选中态是实底主色：全站唯一表示「当前所在位置」的强信号 */
+/*
+  选中态：主色浅底 + 左侧 3px 色条。
+  刻意不用主色实底 ——「实底」是全站最重的信号，必须留给页面主操作。
+  侧边栏选中态若也用实底，就会和「发送请求」这类按钮在同一屏里争夺注意力。
+  指示「当前所在位置」的职责交给左侧色条，浅底只是它的底衬。
+*/
 .all-tools-button.active {
-    -fx-background-color: -dt-accent;
+    -fx-background-color: -dt-accent, -dt-accent-soft;
+    -fx-background-insets: 0, 0 0 0 3;
+    -fx-background-radius: 8px, 0 8px 8px 0;
     -fx-font-weight: bold;
 }
 
-.all-tools-button.active,
-.all-tools-button.active .text {
-    -fx-text-fill: -dt-text-invert;
-    -fx-fill: -dt-text-invert;
+.all-tools-button.active .all-tools-text {
+    -fx-text-fill: -dt-accent-pressed;
+    -fx-font-weight: bold;
+}
+
+.all-tools-button.active .all-tools-count {
+    -fx-text-fill: -dt-accent;
+}
+
+.all-tools-button.active .icon {
+    -fx-stroke: -dt-accent;
 }
 
 /* ---------- 分组小标题 ---------- */
 
 .sidebar-section-label {
-    -fx-font-size: 12px;
+    -fx-font-size: 11px;
     -fx-font-weight: bold;
     -fx-text-fill: -dt-text-subtle;
-    -fx-padding: 0 2 0 2;
+    -fx-padding: 0 10 0 10;
 }
 
 .sidebar-head {
-    -fx-padding: 0 16 0 16;
+    -fx-padding: 0 12 0 12;
     -fx-spacing: 10;
 }
 
@@ -288,8 +407,8 @@
 
 .folder-pane > .title {
     -fx-background-color: transparent;
-    -fx-background-radius: 6px;
-    -fx-padding: 7 8;
+    -fx-background-radius: 8px;
+    -fx-padding: 7 10;
     -fx-cursor: hand;
 }
 
@@ -309,12 +428,6 @@
     -fx-background-color: transparent;
     -fx-border-width: 0;
     -fx-padding: 0;
-}
-
-.folder-icon {
-    -fx-font-size: 13px;
-    -fx-text-fill: -dt-text-muted;
-    -fx-min-width: 18;
 }
 
 .folder-name {
@@ -339,15 +452,16 @@
 
 /* 缩进 + 一条竖线，表达「这些子项属于上面的文件夹」 */
 .folder-items-line {
-    -fx-padding: 0 0 0 14;
+    -fx-padding: 0 0 0 12;
     -fx-border-color: -dt-border;
     -fx-border-width: 0 0 0 1;
-    -fx-border-insets: 0 0 0 15;
+    -fx-border-insets: 0 0 0 22;
 }
 
 .module-item {
-    -fx-padding: 6 8;
-    -fx-background-radius: 6px;
+    -fx-padding: 0 8;
+    -fx-pref-height: 32px;
+    -fx-background-radius: 7px;
     -fx-cursor: hand;
 }
 
@@ -355,10 +469,8 @@
     -fx-background-color: -dt-surface-hover;
 }
 
-.module-item-icon {
-    -fx-font-size: 12px;
-    -fx-text-fill: -dt-text-subtle;
-    -fx-min-width: 16;
+.module-item:hover .icon {
+    -fx-stroke: -dt-accent;
 }
 
 .module-item-name {
@@ -366,22 +478,26 @@
     -fx-text-fill: -dt-text-muted;
 }
 
+.module-item:hover .module-item-name {
+    -fx-text-fill: -dt-text;
+}
+
 /* ============================================================
    ⑤ 内容区
    ============================================================ */
 
 .content-pane {
-    -fx-background-color: -dt-surface;
+    -fx-background-color: -dt-content-bg;
 }
 
 .grid-scroll {
-    -fx-background-color: -dt-surface;
+    -fx-background-color: -dt-content-bg;
     -fx-background-insets: 0;
     -fx-padding: 0;
 }
 
 .grid-scroll > .viewport {
-    -fx-background-color: -dt-surface;
+    -fx-background-color: -dt-content-bg;
 }
 
 .grid-body {
@@ -392,7 +508,7 @@
 
 /* 只用一条底部分隔线分层，页头本身不加底色 —— 白色内容区更透气 */
 .page-header {
-    -fx-padding: 18 26 14 26;
+    -fx-padding: 18 24 15 24;
     -fx-spacing: 6;
     -fx-background-color: -dt-surface;
     -fx-border-color: -dt-border;
@@ -423,13 +539,37 @@
 
 /* 宫格 / 详情的实际内容容器，左右留白与页头一致 */
 .page-body {
-    -fx-padding: 20 26 8 26;
+    -fx-padding: 22 24 8 24;
     -fx-spacing: 22;
+}
+
+/*
+  宫格页的分组标题做成一条「分隔带」，而不是一行小字。
+  它承担的是分区锚点的职责 —— 扫视时需要立刻看到分区边界，
+  所以左边的图标与名称要够重（旧版用 12px 极淡灰，
+  是全页最弱的元素，却干着最该被看见的活），
+  右边再用一条贯穿的细线把边界画满。
+*/
+.section-head {
+    -fx-spacing: 9px;
+    -fx-alignment: center-left;
 }
 
 .section-title {
     -fx-font-size: 12px;
     -fx-font-weight: bold;
+    -fx-text-fill: -dt-text-muted;
+}
+
+.section-rule {
+    -fx-background-color: -dt-border;
+    -fx-min-height: 1;
+    -fx-pref-height: 1;
+    -fx-max-height: 1;
+}
+
+.section-count {
+    -fx-font-size: 11px;
     -fx-text-fill: -dt-text-subtle;
 }
 
@@ -441,14 +581,19 @@
    ⑥ 功能卡片
    ============================================================ */
 
+/* 卡片：252 x 106 横向紧凑型。
+   尺寸由内容量决定 —— 旧版 246 x 214 里内容只占约 55%，底部近 90px 是死白，
+   一屏只能看到 2.7 行。横向布局把「图标 → 标题 → 说明」压成一条水平扫视路径，
+   同一屏可见卡片数从 8 张提到 18 张。
+   高度按「上下内边距 + 一行标题 + 两行说明」定死，内容垂直居中 ——
+   顶端对齐时，说明只有一行的卡片底部会多出十几像素空档，像没画完。 */
 .tool-card {
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 12px;
     -fx-border-color: -dt-border;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1;
-    -fx-padding: 18 18 16 18;
-    -fx-spacing: 0;
+    -fx-padding: 16;
     -fx-cursor: hand;
 }
 
@@ -465,55 +610,49 @@
 
 /* ---------- 图标底托 ---------- */
 
-/* Unicode 符号在不同字体下视觉重量差异很大，统一放进主色浅底方块
-   拉齐节奏；刻意不做色轮换色，避免卡片墙变成调色盘 */
+/* 图标底托。所有图标同尺寸、同描边、同底色 —— 不做色轮换色，
+   否则卡片墙会变成调色盘，也会削弱主色作为「可操作」信号的作用 */
 .tool-card-icon-box {
-    -fx-pref-width: 40;
-    -fx-pref-height: 40;
-    -fx-min-width: 40;
-    -fx-min-height: 40;
-    -fx-max-width: 40;
-    -fx-max-height: 40;
+    -fx-pref-width: 38;
+    -fx-pref-height: 38;
+    -fx-min-width: 38;
+    -fx-min-height: 38;
+    -fx-max-width: 38;
+    -fx-max-height: 38;
     -fx-background-color: -dt-accent-soft;
-    -fx-background-radius: 12px;
+    -fx-background-radius: 11px;
     -fx-alignment: center;
-}
-
-.tool-card-icon {
-    -fx-font-size: 19px;
-    -fx-text-fill: -dt-accent;
 }
 
 /* ---------- 卡片文字 ---------- */
 
+/* 标题限定一行，超长由 tooltip 兜底 —— 标题一折行，同一排卡片的
+   说明基线就会错开，宫格的横向扫视基准随之失效 */
 .tool-card-name {
     -fx-font-size: 13.5px;
     -fx-font-weight: bold;
     -fx-text-fill: -dt-text;
-    -fx-line-spacing: 3;
 }
 
 .tool-card-summary {
-    -fx-font-size: 12.5px;
+    -fx-font-size: 12px;
     -fx-text-fill: -dt-text-muted;
-    -fx-line-spacing: 4;
+    -fx-line-spacing: 3;
 }
 
-.tool-card-desc {
-    -fx-font-size: 12px;
-    -fx-text-fill: -dt-text-subtle;
-    -fx-line-spacing: 4;
+/* 右上角箭头：静止时低对比交代「这张卡可点」，悬停转主色。
+   取代旧版底部那行静止时完全不可见的「打开 →」 */
+/*
+  悬停时的「已就绪」反馈交给图标底托：底色填满主色、图标转白。
+  这样不需要在卡片右侧单开一列放箭头（那会白白吃掉约 26px 文字宽度，
+  在 252px 宽的卡片里等于每行少排两个字）。
+*/
+.tool-card:hover .tool-card-icon-box {
+    -fx-background-color: -dt-accent;
 }
 
-/* 卡片底部的「打开」提示：静止时不可见，悬停时出现 */
-.tool-card-hint {
-    -fx-font-size: 12px;
-    -fx-text-fill: -dt-accent;
-    -fx-opacity: 0;
-}
-
-.tool-card:hover .tool-card-hint {
-    -fx-opacity: 1;
+.tool-card:hover .tool-card-icon-box .icon {
+    -fx-stroke: -dt-text-invert;
 }
 
 /* ============================================================
@@ -521,12 +660,26 @@
    ============================================================ */
 
 .detail-wrapper {
-    -fx-background-color: -dt-surface;
+    -fx-background-color: -dt-content-bg;
 }
 
-/* 详情页页头比宫格页高一档 —— 它要额外携带返回入口与导航路径 */
+/* 详情页的滚动容器：底色透出内容区，只留一条细滚动条。
+   它只在内容装不下时才出现滚动条（见 ContentPane#buildDetail）。 */
+.detail-scroll {
+    -fx-background-color: -dt-content-bg;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.detail-scroll > .viewport {
+    -fx-background-color: -dt-content-bg;
+}
+
+/* 带返回按钮的页头（宫格分类页 / 功能详情页）比普通页头略高一档 ——
+   它要额外容纳返回入口。左右留白必须与正文保持一致，否则标题与
+   内容的左边缘会错开 2px，扫视时看得出来。 */
 .page-header-detail {
-    -fx-padding: 14 26 14 26;
+    -fx-padding: 16 24 14 24;
     -fx-spacing: 7;
 }
 
@@ -553,12 +706,15 @@
 /* 返回：有描边的次级按钮，键盘可达（可 Tab 聚焦 + Enter 触发） */
 .back-button {
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 6px;
+    -fx-background-radius: 8px;
     -fx-border-color: -dt-border-strong;
-    -fx-border-radius: 6px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1;
     -fx-font-size: 12.5px;
-    -fx-padding: 5 12;
+    -fx-pref-height: 30px;
+    -fx-min-height: 30px;
+    -fx-padding: 0 11;
+    -fx-graphic-text-gap: 6;
     -fx-cursor: hand;
     -fx-text-fill: -dt-text;
 }
@@ -580,7 +736,7 @@
    ============================================================ */
 
 .module-body {
-    -fx-padding: 20 26 24 26;
+    -fx-padding: 22 24 26 24;
 }
 
 .module-desc {
@@ -592,9 +748,9 @@
 
 .card {
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 11px;
     -fx-border-color: -dt-border;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 11px;
     -fx-border-width: 1;
     -fx-padding: 16;
     -fx-spacing: 12;
@@ -604,12 +760,12 @@
     -fx-spacing: 8;
     -fx-alignment: center-left;
     -fx-padding: 0 0 12 0;
-    -fx-border-color: -dt-border;
+    -fx-border-color: -dt-border-faint;
     -fx-border-width: 0 0 1 0;
 }
 
 .card-head-title {
-    -fx-font-size: 13.5px;
+    -fx-font-size: 13px;
     -fx-font-weight: bold;
     -fx-text-fill: -dt-text;
 }
@@ -638,17 +794,92 @@
     -fx-alignment: center-left;
 }
 
-/* ---------- 结果值 ---------- */
-
-.result-value {
-    -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
-    -fx-font-size: 13.5px;
-    -fx-text-fill: -dt-text;
-}
-
 .caption {
     -fx-font-size: 12px;
     -fx-text-fill: -dt-text-subtle;
+}
+
+/* ---------- 结果行：建立对齐网格 ----------
+   旧版结果是若干行「标签 + 值」各自浮动，标签宽度随文字伸缩，
+   一列读下来需要左右找基准。这里标签定宽 96px、行高 34px，
+   数值一律等宽字体，行间只留一条极轻的分隔线。 */
+.result-row {
+    -fx-padding: 0 12;
+    -fx-min-height: 34px;
+    -fx-pref-height: 34px;
+    -fx-spacing: 10;
+    -fx-alignment: center-left;
+    -fx-background-color: -dt-surface;
+}
+
+.result-row-divided {
+    -fx-border-color: -dt-border-faint;
+    -fx-border-width: 1 0 0 0;
+}
+
+.result-label {
+    -fx-min-width: 96px;
+    -fx-pref-width: 96px;
+    -fx-max-width: 96px;
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+.result-value {
+    -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
+    -fx-font-size: 13px;
+    -fx-text-fill: -dt-text;
+}
+
+/* 空值用破折号而非连字符：连字符在等宽字体里太短，
+   混在 13px 数值中看起来像一个待填的输入格 */
+.result-value-empty {
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* 结果行组容器：整体一个圆角描边，行间只靠内部细线分隔 */
+.result-table {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 9px;
+    -fx-border-color: -dt-border;
+    -fx-border-radius: 9px;
+    -fx-border-width: 1;
+    -fx-padding: 1;
+}
+
+/* ---------- 空状态 ----------
+   统一语法：图标 + 主文案 + 次文案，居中。
+   旧版各页空态不一致 —— 有的是一句居中灰字，有的是左上角占位符，
+   用户分不清「这里是空的」和「这里坏了」。 */
+.empty-state {
+    -fx-alignment: center;
+    -fx-spacing: 9px;
+    -fx-padding: 26;
+}
+
+.empty-state-title {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text;
+}
+
+.empty-state-hint {
+    -fx-font-size: 11.5px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* 可拖放容器：虚线框提示「把东西放进来」 */
+.drop-zone {
+    -fx-background-color: -dt-surface-alt;
+    -fx-background-radius: 10px;
+    -fx-border-color: -dt-segmented-edge;
+    -fx-border-radius: 10px;
+    -fx-border-width: 1.5;
+    -fx-border-style: segments(5, 4);
+}
+
+.drop-zone:drag-over {
+    -fx-border-color: -dt-accent;
+    -fx-background-color: -dt-accent-soft;
 }
 
 /* ---------- 状态提示：文字 + 符号，不单靠颜色 ---------- */
@@ -734,6 +965,23 @@
     -fx-background-color: -dt-accent-soft;
 }
 
+/* 空态（未载入）时的预览框会额外挂 .drop-zone，呈现虚线边框。
+   这里必须写成 .image-preview-holder.drop-zone：单写 .drop-zone 与
+   .image-preview-holder 特异性相同，胜负只看两条规则在文件里的先后，
+   而 .drop-zone 定义在「空状态」章节（更靠前），于是线型改不动 ——
+   且不会有任何报错，只是虚线一直显示为实线。组合选择器把特异性提上去，
+   从此不依赖章节顺序。 */
+.image-preview-holder.drop-zone {
+    -fx-border-color: -dt-segmented-edge;
+    -fx-border-width: 1.5;
+    -fx-border-style: segments(5, 4);
+}
+
+.image-preview-holder.drop-zone:drag-over {
+    -fx-border-color: -dt-accent;
+    -fx-background-color: -dt-accent-soft;
+}
+
 /* 右侧参数滚动区：去掉默认描边，融入面板 */
 .image-param-scroll {
     -fx-background-color: transparent;
@@ -743,6 +991,14 @@
 
 .image-param-scroll > .viewport {
     -fx-background-color: transparent;
+}
+
+/* 失效的参数行（当前只有「JPEG 质量」在输出非 JPEG 时用得上）。
+   AtlantaFX 里禁用滑块的拇指仍是主色，与启用态几乎分辨不出，
+   所以这里整行降到 42% 不透明度 —— 配合下方的文字说明，
+   「这个参数现在不起作用」才是一眼可读的。 */
+.quality-row:disabled {
+    -fx-opacity: 0.42;
 }
 
 /* 参数区分组标题 */
@@ -766,10 +1022,14 @@
 .text-field,
 .password-field {
     -fx-pref-height: 32px;
+    /* min 必须与 pref 一起写：pref 只是「建议值」，父容器空间不足时
+       VBox 会把子节点一路压到 min。只写 pref 的后果是控件被压成
+       18px 的细条（内容自然高），看起来像渲染坏了而不是「挤了一点」。 */
+    -fx-min-height: 32px;
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 6px;
+    -fx-background-radius: 8px;
     -fx-border-color: -dt-border-strong;
-    -fx-border-radius: 6px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1;
     -fx-padding: 0 10;
     -fx-prompt-text-fill: -dt-text-subtle;
@@ -781,40 +1041,140 @@
     -fx-border-color: -dt-accent;
 }
 
+/* ---------- 按钮四级 ----------
+   主操作：实底，全页唯一
+   次操作：描边，可并列多个
+   静默：纯文字，辅助动作（如「用作批处理模板」）
+   破坏：危险色描边，与可逆操作明确分开
+   四级共用高度与圆角，状态切换不改变尺寸。 */
 .button {
     -fx-pref-height: 32px;
-    -fx-padding: 0 14;
-    -fx-background-radius: 6px;
-    -fx-border-radius: 6px;
+    -fx-min-height: 32px;   /* 见 .text-field 处的说明：防压缩 */
+    -fx-padding: 0 13;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1;
+    -fx-border-color: transparent;
     -fx-font-size: 12.5px;
     -fx-cursor: hand;
 }
 
-/* 主轴按钮：一屏只允许一处主色实底（该功能页的主操作） */
 .button-primary {
     -fx-background-color: -dt-accent;
+    -fx-border-color: -dt-accent;
     -fx-text-fill: -dt-text-invert;
     -fx-font-weight: bold;
 }
 
 .button-primary:hover {
     -fx-background-color: -dt-accent-hover;
+    -fx-border-color: -dt-accent-hover;
 }
 
 .button-primary:pressed {
     -fx-background-color: -dt-accent-pressed;
+    -fx-border-color: -dt-accent-pressed;
 }
 
 .button-primary:disabled {
-    -fx-opacity: 0.5;
+    -fx-opacity: 0.45;
+}
+
+/* 次操作：白底 + 描边。
+   旧版误用填充按钮（.flat 的灰底），一屏里出现 1 个蓝实底 + 4 个灰实底，
+   五个按钮重量相近，读不出哪个才是主操作。 */
+.button-secondary,
+.button.flat {
+    -fx-background-color: -dt-surface;
+    -fx-border-color: -dt-border-strong;
+    -fx-text-fill: -dt-text;
+}
+
+.button-secondary:hover,
+.button.flat:hover {
+    -fx-background-color: -dt-surface-sunken;
+    -fx-border-color: -dt-text-subtle;
+}
+
+.button-secondary:disabled,
+.button.flat:disabled {
+    -fx-opacity: 0.45;
+}
+
+/* 静默：无底无框，悬停才给一层浅底 */
+.button-quiet {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: -dt-accent;
+    -fx-padding: 0 8;
+}
+
+.button-quiet:hover {
+    -fx-background-color: -dt-accent-soft;
+}
+
+.button-quiet:disabled {
+    -fx-opacity: 0.45;
+}
+
+.button-danger {
+    -fx-background-color: -dt-surface;
+    -fx-border-color: -dt-danger-border;
+    -fx-text-fill: -dt-danger;
+}
+
+.button-danger:hover {
+    -fx-background-color: -dt-danger-soft;
+}
+
+.button-danger:disabled {
+    -fx-opacity: 0.45;
+}
+
+/* ---------- 分段控件（外层业务页签） ----------
+   与外层「下划线」页签形成形态上的主从区分：
+   外层是容器 + 滑块，内层是文字 + 下划线。
+   旧版两层都用下划线，看起来像同一个控件复制了两遍。 */
+.segmented {
+    -fx-background-color: -dt-segmented-track;
+    -fx-background-radius: 9px;
+    -fx-padding: 3;
+    -fx-spacing: 2;
+    -fx-alignment: center-left;
+}
+
+.segmented-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 7px;
+    -fx-border-color: transparent;
+    -fx-border-radius: 7px;
+    -fx-border-width: 1;
+    -fx-pref-height: 30px;
+    -fx-min-height: 30px;
+    -fx-padding: 0 15;
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text-muted;
+    -fx-cursor: hand;
+}
+
+.segmented-item:hover {
+    -fx-text-fill: -dt-text;
+}
+
+.segmented-item:selected {
+    -fx-background-color: -dt-segmented-thumb;
+    -fx-border-color: -dt-segmented-edge;
+    -fx-text-fill: -dt-text;
+    -fx-font-weight: bold;
 }
 
 .combo-box {
     -fx-pref-height: 32px;
+    -fx-min-height: 32px;
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 6px;
+    -fx-background-radius: 8px;
     -fx-border-color: -dt-border-strong;
-    -fx-border-radius: 6px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1;
 }
 
@@ -826,13 +1186,96 @@
     -fx-text-fill: -dt-text;
 }
 
+/* 数字框默认形态是「输入框 + 右侧一块独立箭头区」两块拼接，
+   边框与圆角各画各的，和同屏 ComboBox 摆在一起明显不是一套东西。
+   这里把它收成一个整体：外框统一由 .spinner 画，内部控件全部透明。 */
 .spinner {
     -fx-pref-height: 32px;
+    -fx-min-height: 32px;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 8px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1;
+}
+
+.spinner:focused {
+    -fx-border-color: -dt-accent;
+}
+
+.spinner .text-field {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8 0 0 8;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-min-height: 26px;
+    -fx-padding: 0 0 0 10;
+    -fx-font-size: 12.5px;
+}
+
+.spinner .increment-arrow-button,
+.spinner .decrement-arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0 8 8 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0 7;
+}
+
+.spinner .increment-arrow-button:hover,
+.spinner .decrement-arrow-button:hover {
+    -fx-background-color: -dt-surface-sunken;
+}
+
+.spinner .increment-arrow,
+.spinner .decrement-arrow {
+    -fx-background-color: -dt-text-subtle;
 }
 
 .separator .line {
     -fx-border-color: -dt-border;
     -fx-border-width: 1 0 0 0;
+}
+
+/* ---------- 示例 chip ----------
+   与按钮的本质区别：chip 承载的是「一段可直接使用的数据」，不是一个动作。
+   所以右侧表达式用等宽字并压低一档色阶，让左侧的自然语言名称保持视觉主体；
+   悬停时整块转主色，暗示「点一下就能用」。
+   比次级按钮更轻：无阴影、描边色更淡、内边距更小。 */
+.chip {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 7px;
+    -fx-min-height: 28px;   /* 紧凑尺度：比标准控件矮一档 */
+    -fx-border-color: -dt-border;
+    -fx-border-radius: 7px;
+    -fx-border-width: 1;
+    -fx-padding: 5px 10px;
+    -fx-cursor: hand;
+}
+
+.chip:hover {
+    -fx-background-color: -dt-accent-soft;
+    -fx-border-color: -dt-accent-border;
+}
+
+.chip:focused {
+    -fx-border-color: -dt-accent;
+}
+
+.chip-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-muted;
+}
+
+.chip-code {
+    -fx-font-family: "Consolas", "Cascadia Mono", "Menlo", monospace;
+    -fx-font-size: 11.5px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+.chip:hover .chip-label,
+.chip:hover .chip-code {
+    -fx-text-fill: -dt-accent;
 }
 
 /* ============================================================
@@ -848,10 +1291,11 @@
     -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
     -fx-font-size: 12.5px;
     -fx-pref-height: 36px;
+    -fx-min-height: 36px;   /* 强调尺度：请求行整条保持一致 */
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 6px;
+    -fx-background-radius: 8px;
     -fx-border-color: -dt-border-strong;
-    -fx-border-radius: 6px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1;
     -fx-padding: 0 12;
 }
@@ -866,38 +1310,60 @@
     -fx-font-size: 12.5px;
     -fx-font-weight: bold;
     -fx-pref-height: 36px;
-    -fx-background-radius: 6px;
-    -fx-border-radius: 6px;
+    -fx-min-height: 36px;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 8px;
+    -fx-border-color: -dt-border-strong;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1;
 }
 
 /* 发送 / 执行：全页唯一主操作 */
 .http-send {
     -fx-background-color: -dt-accent;
+    -fx-border-color: -dt-accent;
     -fx-text-fill: -dt-text-invert;
     -fx-font-weight: bold;
     -fx-pref-height: 36px;
-    -fx-background-radius: 6px;
-    -fx-border-radius: 6px;
+    -fx-min-height: 36px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1;
+    -fx-padding: 0 20;
     -fx-cursor: hand;
 }
 
 .http-send:hover {
     -fx-background-color: -dt-accent-hover;
+    -fx-border-color: -dt-accent-hover;
 }
 
 .http-send:pressed {
     -fx-background-color: -dt-accent-pressed;
+    -fx-border-color: -dt-accent-pressed;
 }
 
 .http-send:disabled {
-    -fx-opacity: 0.5;
+    -fx-opacity: 0.45;
 }
 
 .http-hint-row {
     -fx-padding: 0;
 }
 
-/* ---------- TabPane：下划线表示当前位置，不用整块方框 ---------- */
+/* ---------- TabPane ----------
+   站内有「外层业务页签」与「内层数据页签」两层。旧版两层共用同一条
+   2px 下划线，看起来像同一个控件被复制了两遍 —— 谁包裹谁、谁是当前
+   业务场景、谁只是场景里的一份数据，全部读不出来。
+
+   现在按主从分成两种形态：
+     外层（.http-main-tabs / .qr-tabs）—— 浅底轨道 + 白色滑块，
+        与 UiKit.segmented 同一套长相，语义是「换一个业务场景」；
+     内层（.http-tabs 等）—— 文字 + 2px 下划线，语义是
+        「在同一个场景里换一份数据」。
+
+   结构上仍然保留 TabPane：页签的内容切换、无障碍语义都由它承担，
+   换皮比换组件风险低得多。 */
 
 .tab-pane {
     -fx-tab-min-height: 30;
@@ -914,12 +1380,15 @@
     -fx-border-width: 0 0 1 0;
 }
 
+/* ---------- 内层数据页签：文字 + 下划线 ---------- */
+
 .tab-pane > .tab-header-area > .headers-region > .tab {
     -fx-background-color: transparent;
     -fx-background-radius: 0;
     -fx-border-width: 0 0 2 0;
     -fx-border-color: transparent;
     -fx-padding: 5 14;
+    -fx-min-height: 30px;
 }
 
 .tab-pane > .tab-header-area > .headers-region > .tab:hover {
@@ -946,6 +1415,67 @@
     -fx-padding: 14 0 0 0;
 }
 
+/* ---------- 外层业务页签：浅底轨道 + 白色滑块 ---------- */
+
+/* 轨道只包住页签本身，不铺满整行宽度 —— 铺满会变成一条横贯页面的灰带，
+   反而比下划线更抢视线。 */
+.http-main-tabs > .tab-header-area > .headers-region,
+.qr-tabs > .tab-header-area > .headers-region {
+    -fx-background-color: -dt-segmented-track;
+    -fx-background-radius: 9px;
+    -fx-padding: 3;
+}
+
+.http-main-tabs > .tab-header-area,
+.qr-tabs > .tab-header-area {
+    -fx-padding: 0 0 12 0;
+}
+
+.http-main-tabs > .tab-header-area > .tab-header-background,
+.qr-tabs > .tab-header-area > .tab-header-background {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+}
+
+.http-main-tabs > .tab-header-area > .headers-region > .tab,
+.qr-tabs > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 7px;
+    -fx-border-width: 0;
+    /* 固定 32px，与按钮/输入框同处一个高度带。
+       原来靠 padding 6 18 撑高，实测渲染出 42px 的滑块 + 48px 的轨道，
+       比同屏任何控件都高一档，视觉重量完全失衡。 */
+    -fx-pref-height: 32px;
+    -fx-min-height: 32px;
+    -fx-padding: 0 18;
+}
+
+.http-main-tabs > .tab-header-area > .headers-region > .tab:hover,
+.qr-tabs > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: -dt-surface-sunken;
+    -fx-background-radius: 7px;
+}
+
+.http-main-tabs > .tab-header-area > .headers-region > .tab:selected,
+.qr-tabs > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -dt-segmented-thumb;
+    -fx-background-radius: 7px;
+    -fx-border-color: -dt-segmented-edge;
+    -fx-border-radius: 7px;
+    -fx-border-width: 1;
+}
+
+.http-main-tabs > .tab-header-area > .headers-region > .tab .tab-label,
+.qr-tabs > .tab-header-area > .headers-region > .tab .tab-label {
+    -fx-font-size: 13.5px;
+}
+
+.http-main-tabs > .tab-header-area > .headers-region > .tab:selected .tab-label,
+.qr-tabs > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
 /* Tab 的焦点环默认画在整个 header 上，视觉很吵，改到文字下划线 */
 .tab-pane > .tab-header-area > .headers-region > .tab:focused {
     -fx-faint-focus-color: transparent;
@@ -960,22 +1490,27 @@
 
 .kv-table {
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
     -fx-border-color: -dt-border;
     -fx-border-width: 1;
     -fx-padding: 1;
+    /* 无数据时也保持约三行高度。旧版空表被压成 35px 一条，
+       看起来像控件坏了而不是「还没有内容」 */
+    -fx-min-height: 104px;
 }
 
 /* ---------- 结果表 / 预览表（无 class 的 TableView 也统一） ---------- */
 
 .table-view {
     -fx-background-color: -dt-surface;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
     -fx-border-color: -dt-border;
     -fx-border-width: 1;
     -fx-padding: 1;
+    /* 空表也保有约三行的高度，避免塌成一条 */
+    -fx-min-height: 104px;
 }
 
 .table-view .column-header-background {
@@ -1042,6 +1577,25 @@
     -fx-text-fill: -dt-text-subtle;
 }
 
+/* ---------- Cron 执行时间表 ----------
+   时间与「距现在」都是数字串，只有等宽字才能让相邻两行的字符纵向对齐；
+   表头反过来仍用界面字体 —— 等宽字的标题看起来像代码，不像列名。 */
+.cron-next-table {
+    /* 高度写死在 CSS 里而不是靠 setMinHeight：CSS 优先级高于代码里的 setter，
+       .table-view 的 min-height 会盖掉 Java 侧设的值，两条一起写容易看不懂。 */
+    -fx-min-height: 336px;
+    -fx-pref-height: 336px;
+}
+
+.cron-next-table .table-cell {
+    -fx-font-family: "Consolas", "Cascadia Mono", "Menlo", monospace;
+}
+
+.cron-next-table .column-header .label {
+    -fx-font-family: "Microsoft YaHei UI", "Microsoft YaHei",
+                     "Segoe UI", "PingFang SC", sans-serif;
+}
+
 /* ---------- 响应状态条 ---------- */
 
 .http-response-bar {
@@ -1069,9 +1623,55 @@
     -fx-padding: 14 0 0 0;
 }
 
-/* 识别结果区：等宽字体便于核对网址与转义字符 */
+/* 识别结果区：滚动容器本身不要底色，让结果卡片浮在内容底之上 */
 .qr-result {
-    -fx-font-size: 13px;
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-padding: 0;
+}
+
+.qr-result > .viewport {
+    -fx-background-color: transparent;
+}
+
+.qr-result-list {
+    -fx-padding: 1 12 1 1;
+}
+
+/* 一条结果一张卡片：序号 + 格式标签 + 正文。
+   旧版把结果塞进一个只读文本域，多码图片只能看到第一个码 ——
+   结构上就装不下「多个结果」这件事，所以改成可堆叠的卡片列表。 */
+.qr-result-card {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 9px;
+    -fx-border-color: -dt-border;
+    -fx-border-radius: 9px;
+    -fx-border-width: 1;
+    -fx-padding: 10 12;
+    -fx-spacing: 6;
+}
+
+.qr-result-index {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text-muted;
+}
+
+/* 格式标签（QR_CODE / EAN_13 …）：等宽字 + 浅主色底，与正文区分 */
+.qr-result-format {
+    -fx-font-family: "Consolas", "Cascadia Mono", "Menlo", monospace;
+    -fx-font-size: 10.5px;
+    -fx-text-fill: -dt-accent;
+    -fx-background-color: -dt-accent-soft;
+    -fx-background-radius: 5px;
+    -fx-padding: 2 7;
+}
+
+/* 正文：等宽便于核对网址与转义字符，可换行 */
+.qr-result-text {
+    -fx-font-family: "Consolas", "Cascadia Mono", "Menlo", monospace;
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text;
 }
 
 .http-status {

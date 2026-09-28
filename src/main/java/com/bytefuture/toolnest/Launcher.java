@@ -1,5 +1,7 @@
 package com.bytefuture.toolnest;
 
+import com.bytefuture.toolnest.app.ToolNestApp;
+
 /**
  * 程序唯一入口。
  *

@@ -1,6 +1,6 @@
 package com.bytefuture.toolnest;
 
-import com.bytefuture.toolnest.modules.qrcode.QrOps;
+import com.bytefuture.toolnest.features.qrcode.QrOps;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;

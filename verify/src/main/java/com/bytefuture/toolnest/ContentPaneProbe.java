@@ -1,19 +1,26 @@
 package com.bytefuture.toolnest;
 
 import com.bytefuture.toolnest.core.ModuleCategory;
-import com.bytefuture.toolnest.core.ToolModule;
-import com.bytefuture.toolnest.core.ToolRegistry;
-import com.bytefuture.toolnest.ui.ContentPane;
+import com.bytefuture.toolnest.ui.spi.ToolModule;
+import com.bytefuture.toolnest.app.ToolRegistry;
+import com.bytefuture.toolnest.ui.shell.ContentPane;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * ContentPane 返回栈的离屏验证探针。
@@ -111,6 +118,51 @@ public class ContentPaneProbe extends Application {
         return null;
     }
 
+    /**
+     * 找到详情页外层的 ScrollPane（按样式类，不按层级位置 —— 层级随时会变）。
+     */
+    private static ScrollPane findDetailScroll(Node node) {
+        if (node instanceof ScrollPane sp && sp.getStyleClass().contains("detail-scroll")) {
+            return sp;
+        }
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                ScrollPane found = findDetailScroll(child);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 收集「实际高度小于首选高度」的输入类控件。
+     *
+     * <p>只统计已经参与布局的（宽度 &gt; 0）；同时跳过 Spinner 内部那个由 Spinner
+     * 自己管理的编辑框 —— 它的高度归 Spinner 管，单独比对只会得到误报。
+     */
+    private static void collectSqueezed(Node node, List<String> squeezed, int[] seen) {
+        boolean measurable = node instanceof Button || node instanceof ComboBox
+                || node instanceof Spinner || node instanceof TextField;
+        boolean spinnerEditor = node instanceof TextField
+                && node.getParent() instanceof Spinner;
+        if (measurable && !spinnerEditor && node instanceof Region r && r.getWidth() > 0) {
+            seen[0]++;
+            if (r.getHeight() + 0.5 < r.getPrefHeight()) {
+                String label = node instanceof Button b ? b.getText()
+                        : node.getClass().getSimpleName();
+                squeezed.add(String.format("「%s」实际 %.0f < 首选 %.0f",
+                        label, r.getHeight(), r.getPrefHeight()));
+            }
+        }
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                collectSqueezed(child, squeezed, seen);
+            }
+        }
+    }
+
     @Override
     public void start(Stage stage) {
         ToolRegistry.bootstrap();
@@ -194,6 +246,39 @@ public class ContentPaneProbe extends Application {
         }
         check("遍历打开全部模块未抛异常", true);
         check("LRU 淘汰后仍能重建已打开的页面（回退不失效）", pane.canGoBack());
+
+        // ---------------------------------------------------------------- 控件尺寸完整性
+        //
+        // 详情页内容比视口高时，超出的部分只能走滚动，绝不能变成对子控件的压缩。
+        // 这条曾经真的坏过：HTTP 页被判成「铺满一屏」不滚动，于是 32px 的按钮
+        // 被压成 18px（= 内容自然高）、104px 的键值表被压成 55px —— 控件被压成
+        // 细条看起来像渲染坏了，而不是「挤了一点」。
+        //
+        // HTTP 页是站内纵向最长的一页（请求行 + 参数区 + 响应区），拿它当样本，
+        // 只要这一页装得下，其余页面更不会出问题。
+        System.out.println("--- 控件尺寸未被压缩 ---");
+        ToolModule http = ToolRegistry.byId("http").orElseThrow();
+        pane.openDetail(http);
+        root.applyCss();
+        root.layout();
+
+        List<String> squeezed = new ArrayList<>();
+        int[] seen = {0};
+        collectSqueezed(pane, squeezed, seen);
+        check("HTTP 页取到可测控件样本（实测 " + seen[0] + " 个）", seen[0] >= 8);
+        check("HTTP 页无控件被压到首选高度以下（被压 " + squeezed.size() + " 个"
+                + (squeezed.isEmpty() ? "" : "：" + squeezed) + "）", squeezed.isEmpty());
+
+        // 上一条只盯住了单个控件。这一条盯整页：页面装不下时，承接方式必须是滚动，
+        // 而不是把整棵内容树压到视口高 —— 前者只是多一条滚动条，后者是静默变形。
+        ScrollPane detailScroll = findDetailScroll(pane);
+        check("详情页外层确实是 ScrollPane", detailScroll != null);
+        if (detailScroll != null && detailScroll.getContent() instanceof Region content) {
+            double want = content.prefHeight(detailScroll.getViewportBounds().getWidth());
+            check(String.format("HTTP 页内容按首选高度布局（实际 %.0f / 首选 %.0f）",
+                            content.getHeight(), want),
+                    content.getHeight() + 1 >= want);
+        }
 
         System.out.println();
         System.out.println("RESULT passed=" + passed + " failed=" + failed);

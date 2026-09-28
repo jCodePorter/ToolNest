@@ -1,6 +1,6 @@
 package com.bytefuture.toolnest;
 
-import com.bytefuture.toolnest.modules.image.ImageOps;
+import com.bytefuture.toolnest.features.image.ImageOps;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;

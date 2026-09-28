@@ -10,22 +10,22 @@ package com.bytefuture.toolnest.core;
  */
 public enum ModuleCategory {
 
-    CONVERT("转换类型工具", "\u21C4"),
-    ENCODE("编码/解码类型工具", "\u2295"),
-    FORMAT("格式化类型工具", "\u2263"),
-    GENERATE("生成类型工具", "\u2726"),
-    TEXT("文本处理类型工具", "\u270E"),
-    NETWORK("网络请求工具", "\u21AF"),
-    IMAGE("图片处理类型工具", "\u25A3"),
-    FILE("文件处理类型工具", "\u25A4"),
-    OTHER("其他工具", "\u25CF");
+    CONVERT("转换类型工具", "switch"),
+    ENCODE("编码/解码类型工具", "code"),
+    FORMAT("格式化类型工具", "braces"),
+    GENERATE("生成类型工具", "sparkle"),
+    TEXT("文本处理类型工具", "type"),
+    NETWORK("网络请求工具", "globe"),
+    IMAGE("图片处理类型工具", "image"),
+    FILE("文件处理类型工具", "file"),
+    OTHER("其他工具", "grid");
 
     private final String label;
-    private final String icon;
+    private final String iconName;
 
-    ModuleCategory(String label, String icon) {
+    ModuleCategory(String label, String iconName) {
         this.label = label;
-        this.icon = icon;
+        this.iconName = iconName;
     }
 
     /** 侧边栏中显示的分类名。 */
@@ -33,8 +33,13 @@ public enum ModuleCategory {
         return label;
     }
 
-    /** 侧边栏中显示的分类图标。 */
-    public String icon() {
-        return icon;
+    /**
+     * 分类图标名，取自 {@code com.bytefuture.toolnest.ui.components.Icons} 注册的线性图标。
+     *
+     * <p>这里存的是<b>名字而不是字符或图形</b>：分类枚举属于 core 层，
+     * 不该依赖任何具体的图标实现、字体或图片资源。名字由展示层解析。
+     */
+    public String iconName() {
+        return iconName;
     }
 }

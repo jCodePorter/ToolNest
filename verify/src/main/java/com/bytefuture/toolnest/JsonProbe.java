@@ -1,6 +1,6 @@
 package com.bytefuture.toolnest;
 
-import com.bytefuture.toolnest.modules.json.JsonFormatModule;
+import com.bytefuture.toolnest.features.json.JsonFormatModule;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Node;

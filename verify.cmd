@@ -11,9 +11,12 @@ REM  Usage:
 REM    verify.cmd compile        compile the probes only
 REM    verify.cmd run <Class>    compile then run one probe
 REM    verify.cmd cron           shortcut: run CronTest
+REM    verify.cmd cronui         shortcut: run CronModuleProbe (UI)
+REM    verify.cmd tsui           shortcut: run TimestampModuleProbe (UI)
 REM    verify.cmd image          shortcut: run ImageTest
 REM    verify.cmd qr             shortcut: run QrTest (no UI)
 REM    verify.cmd qrpic          shortcut: run QrModuleProbe (UI)
+REM    verify.cmd qrlist         shortcut: run MultiQrProbe (UI, multi-code result list)
 REM    verify.cmd sel            shortcut: run SelectionE2EProbe (crop/selection)
 REM    verify.cmd smoke          shortcut: run SmokeTest (screenshots)
 REM    verify.cmd json           shortcut: run JsonProbe
@@ -76,13 +79,16 @@ if /I "%~1"==""       goto :usage
 REM ---- map shortcuts to class names -------------------------
 set "TARGET_CLASS=%~2"
 if /I "%~1"=="cron"    set "TARGET_CLASS=com.bytefuture.toolnest.CronTest"
+if /I "%~1"=="cronui"  set "TARGET_CLASS=com.bytefuture.toolnest.CronModuleProbeLauncher"
+if /I "%~1"=="tsui"    set "TARGET_CLASS=com.bytefuture.toolnest.TimestampModuleProbeLauncher"
 if /I "%~1"=="image"   set "TARGET_CLASS=com.bytefuture.toolnest.ImageTest"
 if /I "%~1"=="qr"      set "TARGET_CLASS=com.bytefuture.toolnest.QrTest"
 if /I "%~1"=="smoke"   set "TARGET_CLASS=com.bytefuture.toolnest.SmokeTestLauncher"
 if /I "%~1"=="json"    set "TARGET_CLASS=com.bytefuture.toolnest.JsonProbeLauncher"
-if /I "%~1"=="body"    set "TARGET_CLASS=com.bytefuture.toolnest.modules.http.HttpBodyProbeLauncher"
-if /I "%~1"=="qrpic"   set "TARGET_CLASS=com.bytefuture.toolnest.modules.qrcode.QrModuleProbeLauncher"
-if /I "%~1"=="sel"     set "TARGET_CLASS=com.bytefuture.toolnest.modules.qrcode.SelectionE2EProbeLauncher"
+if /I "%~1"=="body"    set "TARGET_CLASS=com.bytefuture.toolnest.features.http.HttpBodyProbeLauncher"
+if /I "%~1"=="qrpic"   set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode.QrModuleProbeLauncher"
+if /I "%~1"=="qrlist"  set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode.MultiQrProbeLauncher"
+if /I "%~1"=="sel"     set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode.SelectionE2EProbeLauncher"
 if /I "%~1"=="nav"     set "TARGET_CLASS=com.bytefuture.toolnest.ContentPaneProbeLauncher"
 if /I "%~1"=="preview" set "TARGET_CLASS=com.bytefuture.toolnest.DesignPreview"
 if /I "%~1"=="run"     set "TARGET_CLASS=%~2"
@@ -149,6 +155,6 @@ goto :eof
 echo Usage:
 echo   verify.cmd compile        compile probes only
 echo   verify.cmd run ^<Class^>    compile then run a probe class
-echo   verify.cmd cron ^| image ^| qr ^| qrpic ^| sel ^| json ^| body ^| nav ^| preview ^| smoke
+echo   verify.cmd cron ^| cronui ^| tsui ^| image ^| qr ^| qrpic ^| qrlist ^| sel ^| json ^| body ^| nav ^| preview ^| smoke
 echo.
 exit /b 1

@@ -1,11 +1,11 @@
 package com.bytefuture.toolnest;
 
 import com.bytefuture.toolnest.core.ModuleCategory;
-import com.bytefuture.toolnest.core.ToolRegistry;
-import com.bytefuture.toolnest.modules.http.HttpToolModule;
-import com.bytefuture.toolnest.modules.json.JsonFormatModule;
-import com.bytefuture.toolnest.modules.timestamp.TimestampModule;
-import com.bytefuture.toolnest.ui.MainWindow;
+import com.bytefuture.toolnest.app.ToolRegistry;
+import com.bytefuture.toolnest.features.http.HttpToolModule;
+import com.bytefuture.toolnest.features.json.JsonFormatModule;
+import com.bytefuture.toolnest.features.timestamp.TimestampModule;
+import com.bytefuture.toolnest.ui.shell.MainWindow;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
@@ -92,6 +92,35 @@ public class DesignPreview {
         root.openCategory(ModuleCategory.CONVERT);
         forceLayout(root);
         shoot(scene, "05-grid-convert.png");
+
+        // 「所有工具」：唯一会渲染分组分隔带的页面，必须单独出一张，
+        // 否则分组标题的层级只能靠读 CSS 判断
+        root.openAllTools();
+        forceLayout(root);
+        shoot(scene, "06-all-tools.png");
+
+        // 图片处理 / 二维码：左右分栏 + 预览区，是「参数密集页」的代表，
+        // 按钮层级与空态都在这两页上验证
+        jump(root, "image-tools");
+        forceLayout(root);
+        shoot(scene, "07-detail-image.png");
+
+        jump(root, "qrcode");
+        forceLayout(root);
+        shoot(scene, "08-detail-qrcode.png");
+
+        // 结果行密集页与按钮密集页：对齐网格和按钮层级在这两页最容易露馅
+        jump(root, "cron");
+        forceLayout(root);
+        shoot(scene, "09-detail-cron.png");
+
+        jump(root, "encode");
+        forceLayout(root);
+        shoot(scene, "10-detail-encode.png");
+
+        jump(root, "text-tools");
+        forceLayout(root);
+        shoot(scene, "11-detail-text.png");
 
         System.out.println("[preview] all shots done");
         System.out.flush();

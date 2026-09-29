@@ -22,6 +22,8 @@ REM    verify.cmd smoke          shortcut: run SmokeTest (screenshots)
 REM    verify.cmd json           shortcut: run JsonProbe
 REM    verify.cmd body           shortcut: run HttpBodyProbe
 REM    verify.cmd nav            shortcut: run ContentPaneProbe
+REM    verify.cmd diff           shortcut: run DiffTest (no UI)
+REM    verify.cmd diffui         shortcut: run DiffModuleProbe (UI, two-column diff)
 REM    verify.cmd preview        shortcut: run DesignPreview
 REM
 REM  Add -nobuild to skip rebuilding the fat jar (faster when you only
@@ -90,6 +92,8 @@ if /I "%~1"=="qrpic"   set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode
 if /I "%~1"=="qrlist"  set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode.MultiQrProbeLauncher"
 if /I "%~1"=="sel"     set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode.SelectionE2EProbeLauncher"
 if /I "%~1"=="nav"     set "TARGET_CLASS=com.bytefuture.toolnest.ContentPaneProbeLauncher"
+if /I "%~1"=="diff"    set "TARGET_CLASS=com.bytefuture.toolnest.features.diff.DiffTest"
+if /I "%~1"=="diffui"  set "TARGET_CLASS=com.bytefuture.toolnest.features.diff.DiffModuleProbeLauncher"
 if /I "%~1"=="preview" set "TARGET_CLASS=com.bytefuture.toolnest.DesignPreview"
 if /I "%~1"=="run"     set "TARGET_CLASS=%~2"
 
@@ -155,6 +159,6 @@ goto :eof
 echo Usage:
 echo   verify.cmd compile        compile probes only
 echo   verify.cmd run ^<Class^>    compile then run a probe class
-echo   verify.cmd cron ^| cronui ^| tsui ^| image ^| qr ^| qrpic ^| qrlist ^| sel ^| json ^| body ^| nav ^| preview ^| smoke
+echo   verify.cmd cron ^| cronui ^| tsui ^| image ^| qr ^| qrpic ^| qrlist ^| sel ^| json ^| body ^| nav ^| diff ^| diffui ^| preview ^| smoke
 echo.
 exit /b 1

@@ -10,6 +10,7 @@ import com.bytefuture.toolnest.features.http.HttpToolModule;
 import com.bytefuture.toolnest.features.image.ImageModule;
 import com.bytefuture.toolnest.features.json.JsonFormatModule;
 import com.bytefuture.toolnest.features.qrcode.QrModule;
+import com.bytefuture.toolnest.features.diff.TextDiffModule;
 import com.bytefuture.toolnest.features.text.TextModule;
 import com.bytefuture.toolnest.features.timestamp.TimestampModule;
 import com.bytefuture.toolnest.features.uuid.UuidModule;
@@ -102,6 +103,7 @@ public final class ToolRegistry {
         register(new EncodeModule());
         register(new UuidModule());
         register(new TextModule());
+        register(new TextDiffModule());
         register(new HttpToolModule());
         register(new FileHashModule());
         register(new ImageModule());

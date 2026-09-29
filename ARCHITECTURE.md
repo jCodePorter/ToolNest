@@ -59,6 +59,7 @@ com.bytefuture.toolnest
     ├── encode/      EncodeModule
     ├── uuid/        UuidModule
     ├── text/        TextModule + TextOps
+    ├── diff/        TextDiffModule + DiffView + DiffOps
     ├── filehash/    FileHashModule + HashOps
     ├── image/       ImageModule + ImageOps
     ├── qrcode/      QrModule + QrOps
@@ -245,11 +246,18 @@ feature 边界与 layer 边界正交，两者都没被表达。
 ### 验证基线
 
 ```
-cron 43 / image 27 / qr 29 / smoke 21 / cronui 13 / json 14
-/ body 22 / nav 19 / qrlist 6 / sel 20 / tsui 17(+4 剪贴板)   = 231
-qrpic 40（依赖系统剪贴板，本次环境不可用未跑）
-完整基线应为 275
+（2026-09-28 全量连跑，14 个探针 375 条断言全绿，CSS 解析错误 0）
+diff 46 / diffui 53 / smoke 22 / nav 19 / json 14 / body 22
+/ cron 43 / cronui 13 / tsui 21 / image 27 / qr 29 / qrpic 40
+/ qrlist 6 / sel 20                                          = 375
 ```
+
+历史：275（新增 `features/diff` 前）→ 359 → 375。`smoke` 由 21 变 22 是因为它逐模块
+断言「界面可构建」，新增功能模块会让它自动多一条。
+
+**计数只许升不许降** —— 某条数下降就说明有断言没跑（通常是探针提前退出）。
+`qrpic` 的 40 条依赖系统剪贴板：同批连跑时若报 `cannot open system clipboard`，
+会因为异常中断而只跑出 36 条 —— 这是环境问题，单独重跑即恢复。
 
 ---
 
@@ -273,9 +281,38 @@ verify.cmd cronui    界面级
 verify.cmd tsui      界面级（读系统剪贴板比对）
 verify.cmd qrpic     界面级（依赖系统剪贴板）
 verify.cmd nav       内容区导航
+verify.cmd diff      纯逻辑（文本对比算法）
+verify.cmd diffui    界面级（两栏文本对比）
 ```
+
+**界面级探针要断言到「渲染结果」而不是「节点存在」**。`diffui` 里踩过一次：
+变更图的条用 `"diff-seg-" + kindClass(...)` 拼出的类名是 `diff-seg-diff-mod`，
+而 CSS 选择器写的是 `.diff-seg.diff-mod` —— 两者对不上，节点照常布局、照常
+`visible`，只是填充透明。只数节点数的断言全绿，放大截图才看出来。
+（变更图已随文本对比的中列一起删除，`.diff-seg*` 规则不复存在 —— 这段保留为
+「类名与 CSS 选择器对不上」的通用教训，同样的坑在 `.diff-item*` / `.diff-band*` 上也一样会踩。）
+
+修法有二：读渲染后的填充色（`Region.getBackground().getFills()`，注意
+`Color.getRed()` 返回 0.0–1.0，转 `#rrggbb` 必须乘 255），或断言样式类名与
+CSS 选择器一致。前者更能覆盖「类名写错」「CSS 被覆盖」两类原因。
+
+**「属性写对了」不等于「位置对了」**。空态文案偏左那次，第一版断言查的是
+`Label.getTextAlignment()`（CSS 的 `-fx-text-alignment`），它<b>确实</b>是
+`CENTER`，断言绿着，而画面上文字仍贴在左边。原因是 JavaFX 里居中要两个属性：
+`-fx-alignment` 决定整块文字摆在标签里的位置（Label 默认 `CENTER_LEFT`），
+`-fx-text-alignment` 只管<b>折行之间</b>的相对对齐。真正的判据是几何：读皮肤内部的
+`label.lookup(".text")` 节点，量它的中心与容器中心是否重合 —— 量标签矩形的中心没用，
+标签被撑满宽度后矩形永远居中，只有里面的文字会偏。
+
+**容器等宽要同时锁「最小宽」和「首选宽」**。文本对比的左右两栏曾出现栏宽 530 / 430、
+栏间分隔线随内容整条横移（同样的窗口下 x 在 517/523/573 之间跳）。原因有两层：
+`Region` 的 minWidth / prefWidth 默认都由<b>内容</b>决定，而 HBox 是按
+「各子节点首选宽 + 均摊剩余」分配的 —— 只把 minWidth 归零，两栏的首选宽不同，
+仍然不等宽。两处都显式设成同一个值，栏宽才只由窗口宽度决定。
 
 **已知环境问题**：多个界面级探针连跑时，系统剪贴板可能被其他进程独占，
 症状是 `cannot open system clipboard`。此时 `tsui` 的 4 条剪贴板断言与
 `qrpic` 会失败 —— 这与代码无关。判别方法：用一个不含项目代码的
 最小程序读写剪贴板，同样失败即可确认是环境问题；单独重跑通常可恢复。
+注意这类失败会<b>中断探针</b>：`qrpic` 正常 40 条，剪贴板被占时只跑出 36 条，
+看到总数变少不要当成「断言被删了」。

@@ -336,12 +336,18 @@ public final class UiKit {
 
         Label titleLabel = new Label(title);
         titleLabel.getStyleClass().add("empty-state-title");
+        // 必须撑满内容宽度：Label 的 maxWidth 默认是 USE_PREF_SIZE，于是标签按「文字原宽」
+        // 摆在容器里 —— 文案一旦比容器宽，右端就溢出、而且 VBox 的居中也随之失效
+        // （居中一个比容器还宽的节点等于没居中）。文字自身的水平对齐由 CSS 的
+        // -fx-text-alignment: center 负责，两者缺一不可。
+        titleLabel.setMaxWidth(Double.MAX_VALUE);
         box.getChildren().add(titleLabel);
 
         if (hint != null && !hint.isBlank()) {
             Label hintLabel = new Label(hint);
             hintLabel.getStyleClass().add("empty-state-hint");
             hintLabel.setWrapText(true);
+            hintLabel.setMaxWidth(Double.MAX_VALUE);
             // 存下引用而不是让调用方按下标去 children 里翻 —— 空状态的节点顺序
             // 一旦调整（比如标题和说明互换），按下标的代码会静默改错元素。
             box.getProperties().put(EMPTY_HINT_KEY, hintLabel);

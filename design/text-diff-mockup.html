@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ToolNest 工具巢 · 文本对比（三列）设计图</title>
+<style>
+/* ============================================================
+   评审页外壳（不是产品界面，只是给设计图套一层说明用的纸）
+   ============================================================ */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#eef1f5;
+  font-family:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI","PingFang SC",sans-serif;
+  font-size:13px;color:#16181d;-webkit-font-smoothing:antialiased;
+}
+.page{max-width:1330px;margin:0 auto;padding:28px 32px 80px}
+.doc-head{border-bottom:1px solid #d2d7de;padding-bottom:16px;margin-bottom:26px}
+.doc-head h1{margin:0 0 8px;font-size:23px;font-weight:700;letter-spacing:0}
+.doc-head p{margin:0;font-size:12px;color:#5a6169;line-height:1.9}
+.doc-head code{font-family:"Cascadia Mono","Consolas",monospace;font-size:11.5px;background:#fff;border:1px solid #e6eaef;border-radius:4px;padding:1px 5px}
+section{background:#fff;border:1px solid #e6eaef;border-radius:12px;padding:22px 24px;margin-bottom:22px}
+section>h2{margin:0 0 6px;font-size:15px;font-weight:700}
+section>h2 .idx{color:#8b929c;font-weight:700;margin-right:8px;font-family:"Cascadia Mono",monospace;font-size:13px}
+section>p.lead{margin:0 0 20px;font-size:12px;color:#5a6169;line-height:1.95}
+h3.sub{margin:26px 0 10px;font-size:13px;font-weight:700}
+h3.sub:first-of-type{margin-top:8px}
+.note{font-size:12px;color:#5a6169;line-height:1.95}
+.note b{color:#16181d}
+.kv-tip{background:#fafbfc;border:1px dashed #d2d7de;border-radius:8px;padding:10px 12px;font-size:12px;color:#5a6169;line-height:1.9;margin:10px 0}
+.kv-tip b{color:#16181d}
+
+/* ============================================================
+   产品界面令牌（与 src/main/resources/css/app.css 的 .root 一一对应）
+   ============================================================ */
+.win{
+  --canvas:#f2f4f7; --content-bg:#f8f9fb; --surface:#fff; --surface-alt:#fafbfc;
+  --sunken:#f2f4f7; --hover:#e8ecf2;
+  --border:#e6eaef; --border-faint:#f0f3f7; --border-strong:#d2d7de;
+  --text:#16181d; --muted:#5a6169; --subtle:#8b929c;
+  --accent:#2563eb; --accent-hover:#1d4fd7; --accent-soft:#eaf0fe; --accent-border:#b8cdfb;
+  --success:#167a4a; --warning:#a1590a; --danger:#c33333;
+  --danger-soft:#fdf1f1; --warning-soft:#fdf6ec; --danger-border:#f0c4c4;
+  --seg-track:#eef1f5; --seg-thumb:#fff; --seg-edge:#dfe4ea;
+  --chip:#e7eaef; --selection:#cfe0fd; --scrollbar:#b3bac4;
+  /* 差异域新增令牌（值取自语义色阶的浅底与词级底色，见 §4） */
+  --d-add-bg:#eaf6ef; --d-add-word:#c8e9d6;
+  --d-del-bg:#fdeeee; --d-del-word:#f7d2d3;
+  --d-mod-bg:#fdf7ec; --d-mod-word:#fbe6c8;
+  --d-gutter:#f4f6f9;
+  --mono:"Cascadia Mono","Consolas","Microsoft YaHei UI",monospace;
+  font-family:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI","PingFang SC",sans-serif;
+  font-size:13px;color:var(--text);
+  background:var(--content-bg);
+  display:flex;
+  border:1px solid var(--border-strong);
+  border-radius:10px;
+  overflow:hidden;
+  position:relative;
+}
+/* ---- 侧边栏 268px ---- */
+.sb{width:268px;flex:0 0 268px;background:var(--canvas);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0 12px}
+.sb-brand{display:flex;align-items:center;gap:9px;padding:18px 8px 16px}
+.sb-brand .logo{width:30px;height:30px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 30px}
+.sb-brand .logo svg{width:17px;height:17px;stroke:#fff}
+.sb-brand .nm{font-size:16px;font-weight:700;line-height:1.15}
+.sb-brand .nm em{display:block;font-style:normal;font-size:11px;font-weight:400;color:var(--subtle)}
+.sb-all{display:flex;align-items:center;gap:9px;height:34px;padding:0 8px;border-radius:6px;background:var(--accent-soft);position:relative;font-size:13px}
+.sb-all::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 2px 2px 0;background:var(--accent)}
+.sb-all svg{width:15px;height:15px;stroke:var(--accent)}
+.sb-all .cnt{margin-left:auto;background:var(--chip);color:var(--muted);font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px}
+.sb-search{margin:10px 0 14px;height:36px;border:1px solid var(--seg-edge);border-radius:8px;background:var(--surface);display:flex;align-items:center;padding-left:10px;gap:8px;color:var(--subtle);font-size:12px}
+.sb-search svg{width:14px;height:14px;stroke:var(--subtle)}
+.sb-cap{font-size:11px;font-weight:700;color:var(--subtle);padding:0 8px 8px}
+.sb-item{display:flex;align-items:center;gap:9px;height:32px;padding:0 8px;border-radius:6px;font-size:13px;color:var(--text)}
+.sb-item svg{width:15px;height:15px;stroke:var(--muted);flex:0 0 15px}
+.sb-item .cnt{margin-left:auto;background:var(--chip);color:var(--muted);font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px}
+.sb-sub{padding-left:17px;border-left:1px solid var(--border);margin-left:16px}
+.sb-sub .sb-item{height:32px;font-size:12.5px}
+.sb-sub .sb-item svg{width:14px;height:14px;stroke:var(--subtle)}
+.sb-sub .sb-item.active{background:var(--accent-soft);color:var(--accent);font-weight:700}
+.sb-sub .sb-item.active svg{stroke:var(--accent)}
+.sb-sub .sb-item .cnt{margin-left:auto;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px}
+.sb-item.new .cnt{background:var(--accent);color:#fff}
+
+/* ---- 内容区 ---- */
+.cn{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--content-bg);position:relative}
+.pg-head{padding:16px 24px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+.pg-head .back{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px 0 8px;border:1px solid var(--border-strong);border-radius:7px;background:var(--surface);font-size:12px;color:var(--muted)}
+.pg-head .back svg{width:13px;height:13px;stroke:var(--muted)}
+.pg-head h1{margin:10px 0 0;font-size:23px;font-weight:700;line-height:1.2}
+.pg-head .cap{margin:6px 0 0;font-size:12px;color:var(--subtle)}
+
+/* ---- 工具条 ---- */
+.bar{display:flex;align-items:center;gap:8px;padding:11px 24px 12px}
+.seg{display:inline-flex;background:var(--seg-track);border:1px solid var(--seg-edge);border-radius:8px;height:32px;padding:2px}
+.seg span{display:flex;align-items:center;padding:0 13px;font-size:13.5px;border-radius:6px;color:var(--muted)}
+.seg span.on{background:var(--seg-thumb);color:var(--text);font-weight:700;box-shadow:0 1px 2px rgba(22,24,29,.09)}
+.chk{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 4px;font-size:12.5px;color:var(--muted)}
+.chk .bx{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border-strong);background:var(--surface);flex:0 0 16px;display:flex;align-items:center;justify-content:center}
+.chk .bx svg{width:11px;height:11px;stroke:#fff}
+.chk.on .bx{background:var(--accent);border-color:var(--accent)}
+.bar .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:8px;font-size:13px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text)}
+.btn svg{width:14px;height:14px;stroke:var(--muted)}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--accent)}
+.btn.quiet svg{stroke:var(--accent)}
+.btn.danger{border-color:var(--danger-border);color:var(--danger)}
+.btn.danger svg{stroke:var(--danger)}
+.btn.sm{height:28px;padding:0 10px;font-size:12.5px}
+
+/* ---- 三列主区 ---- */
+.region{flex:1;display:flex;padding:0 24px 14px;min-height:0}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;position:relative}
+.pane-head{display:flex;align-items:center;gap:8px;padding:0 12px;height:38px;border-bottom:1px solid var(--border);flex:0 0 38px}
+.pane-head .t{font-size:12.5px;font-weight:700}
+.pane-head .m{margin-left:auto;font-size:11.5px;color:var(--subtle);font-family:var(--mono)}
+.div{width:9px;flex:0 0 9px;display:flex;align-items:center;justify-content:center;position:relative}
+.div::after{content:"";width:1px;height:100%;background:var(--border)}
+.code{flex:1;min-height:0;overflow:hidden;font-family:var(--mono);font-size:12.5px;line-height:20px}
+.row{display:flex;align-items:center;height:20px;position:relative;background:var(--surface)}
+.row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.row .mk{flex:0 0 15px;height:100%;display:flex;align-items:center;justify-content:flex-end;background:var(--d-gutter);font-size:12px;font-weight:700;color:transparent}
+.row .ln{flex:0 0 34px;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:9px;background:var(--d-gutter);border-right:1px solid var(--border-faint);color:var(--subtle);font-size:11.5px}
+.row .tx{flex:1;min-width:0;padding-left:10px;white-space:pre;overflow:hidden}
+/* 三类差异的展现：底 + 左缘条 + gutter 标记，三重线索 */
+.row.del{background:var(--d-del-bg)}   .row.del::before{background:var(--danger)}
+.row.del .mk{color:var(--danger)}     .row.del .ln{color:var(--danger);font-weight:700}
+.row.add{background:var(--d-add-bg)}   .row.add::before{background:var(--success)}
+.row.add .mk{color:var(--success)}     .row.add .ln{color:var(--success);font-weight:700}
+.row.mod{background:var(--d-mod-bg)}   .row.mod::before{background:linear-gradient(to bottom,var(--danger) 0 50%,var(--success) 50% 100%)}
+.row.mod .mk{color:var(--warning)}     .row.mod .ln{color:var(--warning);font-weight:700}
+/* 当前差异组：只染行号列，不动行底 */
+.row.cur .ln{color:var(--accent);font-weight:700;background:var(--accent-soft)}
+.row.cur .mk{background:var(--accent-soft)}
+/* 无对应行：斜纹占位，保持左右行对齐 */
+.row.ph{background:repeating-linear-gradient(45deg,#f7f9fb 0 5px,#eef1f5 5px 10px)}
+.row.ph::before{display:none}
+.row.ph .mk,.row.ph .ln{background:transparent;color:transparent}
+/* 词级：删除线 / 下划线 —— 不靠颜色也能分辨 */
+.w{background:var(--d-del-word);text-decoration:line-through;text-decoration-thickness:1px}
+.w.a{background:var(--d-add-word);text-decoration:underline;text-underline-offset:2px}
+
+/* ---- 中列：变更带 ---- */
+.band{width:220px;flex:0 0 220px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;position:relative}
+.band-head{height:38px;flex:0 0 38px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--border);font-size:12.5px;font-weight:700}
+.band-head .m{margin-left:auto;font-size:11.5px;color:var(--subtle);font-weight:400}
+.stats{display:flex;border-bottom:1px solid var(--border-faint);flex:0 0 auto}
+.stats .st{flex:1;padding:9px 0 10px;text-align:center;border-right:1px solid var(--border-faint)}
+.stats .st:last-child{border-right:0}
+.stats .n{display:block;font-family:var(--mono);font-size:15px;font-weight:700;line-height:1.25}
+.stats .l{display:block;font-size:11px;color:var(--subtle)}
+.st-add .n{color:var(--success)} .st-mod .n{color:var(--warning)} .st-del .n{color:var(--danger)}
+.map{flex:0 0 132px;padding:12px 14px;border-bottom:1px solid var(--border-faint);display:flex;gap:8px}
+.map .ruler{display:flex;flex-direction:column;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--subtle);flex:0 0 auto}
+/* 变更密度图：纵向位置 = 在文档中的位置，横向条长 = 该组变更的行数。
+   只画条不画文字 —— 20px 宽的位置上文字缩略只会变成灰噪点。 */
+.map .track{flex:1;position:relative;border-left:1px solid var(--border-faint)}
+.map .seg{position:absolute;left:0;height:8px;border-radius:0 3px 3px 0}
+.map .seg.mod{background:var(--warning)} .map .seg.add{background:var(--success)} .map .seg.del{background:var(--danger)}
+.map .seg.cur{box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--accent)}
+.dlist{flex:1;min-height:0;overflow:hidden}
+.di{padding:7px 10px 8px 12px;border-bottom:1px solid var(--border-faint);position:relative}
+.di::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent}
+.di.cur{background:var(--accent-soft)}
+.di.cur::before{background:var(--accent)}
+.di .top{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+.di .no{font-family:var(--mono);font-weight:700;color:var(--subtle)}
+.di.cur .no{color:var(--accent)}
+.di .tag{font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:4px}
+.tag.add{color:var(--success);background:var(--d-add-bg)}
+.tag.mod{color:var(--warning);background:var(--d-mod-bg)}
+.tag.del{color:var(--danger);background:var(--d-del-bg)}
+.di .loc{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--subtle);white-space:nowrap}
+.di .sum{margin-top:3px;font-family:var(--mono);font-size:11px;color:var(--subtle);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.di.cur .sum{color:var(--muted)}
+.band-foot{flex:0 0 30px;border-top:1px solid var(--border-faint);display:flex;align-items:center;padding:0 12px;font-size:11px;color:var(--subtle)}
+
+/* ---- 底部状态条 ---- */
+.foot{display:flex;align-items:center;gap:10px;padding:0 24px 16px;font-size:12px;color:var(--muted)}
+.foot .mono{font-family:var(--mono);font-size:11.5px;color:var(--subtle)}
+.foot .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.foot .pos{font-family:var(--mono);font-size:11.5px;color:var(--muted);min-width:74px;text-align:center}
+.foot .sep{width:1px;height:16px;background:var(--border)}
+
+/* 空状态 / 提示条 */
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:20px 16px;text-align:center}
+.empty svg{width:26px;height:26px;stroke:var(--subtle)}
+.empty .t{font-size:12.5px;font-weight:700}
+.empty .s{font-size:11.5px;color:var(--subtle);line-height:1.7}
+.empty.ok svg{stroke:var(--success)}
+.notice{display:flex;align-items:flex-start;gap:7px;margin:0 10px 6px;padding:7px 9px;border-radius:6px;background:var(--warning-soft);font-size:11px;color:var(--muted);line-height:1.6}
+.notice svg{width:13px;height:13px;stroke:var(--warning);flex:0 0 13px;margin-top:1px}
+.ph-text{color:var(--subtle)}
+
+/* ---- 放大镜：差异四态 ---- */
+.zoom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.zcard{border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:#fff}
+.zcard h4{margin:0 0 4px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.zcard .why{margin:0 0 12px;font-size:11.5px;color:var(--muted);line-height:1.8}
+.zcode{border:1px solid var(--border);border-radius:8px;overflow:hidden;font-family:var(--mono);font-size:14px;line-height:30px}
+.zcode .row{height:30px}
+.zcode .row .mk{flex:0 0 18px;font-size:14px}
+.zcode .row .ln{flex:0 0 42px;font-size:13px}
+.zcard ul{margin:12px 0 0;padding-left:16px;font-size:11.5px;color:var(--muted);line-height:1.95}
+.zcard ul li::marker{color:var(--subtle)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-size:11.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:14px;height:14px;border-radius:4px;border:1px solid var(--border);display:inline-block}
+
+/* ---- 小尺寸状态块 ---- */
+.miniwrap{display:flex;gap:22px;flex-wrap:wrap}
+.mini{width:619px;height:auto}
+.mini .scale{transform:scale(.62);transform-origin:0 0}
+.mini .slot{width:619px;height:332px;overflow:hidden;border:1px solid var(--border-strong);border-radius:10px;background:#fff}
+.mini .cap{margin-top:8px;font-size:11.5px;color:var(--muted);line-height:1.8}
+.mini .cap b{color:#16181d}
+
+/* ---- 规范表 ---- */
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-faint);vertical-align:top;line-height:1.75}
+th{font-size:11px;font-weight:700;color:var(--subtle);background:var(--surface-alt);border-bottom:1px solid var(--border)}
+td code,.sw{font-family:"Cascadia Mono","Consolas",monospace;font-size:11.5px}
+td b{color:#16181d}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid rgba(22,24,29,.12);vertical-align:-1px;margin-right:6px}
+.pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:4px;font-family:var(--mono)}
+.pill.ok{color:var(--success);background:var(--d-add-bg)}
+.pill.warn{color:var(--warning);background:var(--d-mod-bg)}
+.pill.no{color:var(--danger);background:var(--d-del-bg)}
+ol.q{margin:8px 0 0;padding-left:20px;font-size:12px;color:var(--muted);line-height:2}
+ol.q li b{color:#16181d}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="doc-head">
+  <h1>文本对比 · 三列界面设计图</h1>
+  <p class="notice">
+    <b>本稿为「三列方案」原稿，已被两栏方案取代 —— 中列已删除</b>（统计 / 变更密度图 / 变更清单这三层索引一并移除，「有多少」改由底部状态条承担）。
+    以下所有三列描述仅作历史留档，实现以 <code>DiffView</code> 的两栏版为准，不逐行改写历史。
+  </p>
+  <p>
+    模块 <code>文本处理类工具 / 文本对比</code>　·　版本 v1　·　2026-09-28　·　浅色主题（本产品仅浅色）<br>
+    依据 <code>DESIGN.md</code> 的既有设计系统绘制：令牌取自 <code>css/app.css</code> 的 <code>.root</code>，
+    控件高度沿用 32 / 36 / 30 / 28 四档，按钮沿用四级。画布按实际窗口 1266 × 763 绘制，
+    侧边栏 268px、内容区左右留白 24px，与 <code>build/ui-preview/*.png</code> 同源。
+  </p>
+</div>
+
+<!-- ============================================================ 1 -->
+<section>
+  <h2><span class="idx">01</span>主界面：左原右改，中间一条「变更带」</h2>
+  <p class="lead">
+    三列不是「文本 · 差异 · 文本」的三份副本。左边只放原文、右边只放修改结果，两侧**按行严格对齐**（不存在的行用斜纹占位行补齐，所以同一屏的横向扫视永远对得上）；
+    中间一列专门承担「差异」这件事的三层信息：**统计（有多少）→ 变更地图（在哪里）→ 变更清单（是什么）**。
+    差异本身仍然画在两侧的行上，中间列只做导航与汇总 —— 这是三列能比双列多给出东西的唯一理由。
+  </p>
+
+  <div class="win" style="height:763px">
+    <!-- 侧边栏 -->
+    <div class="sb">
+      <div class="sb-brand">
+        <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 21 8l-9 5-9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 16l9 5 9-5"/></svg></div>
+        <div class="nm">ToolNest<em>工具巢</em></div>
+      </div>
+      <div class="sb-all">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.6 8.4 13.5 13.5 8.4 15.6 10.5 10.5z"/></svg>
+        所有工具<span class="cnt">11</span>
+      </div>
+      <div class="sb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8 20 20"/></svg>
+        搜索功能…
+      </div>
+      <div class="sb-cap">功能分类</div>
+      <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l4 2.2"/></svg>转换类工具<span class="cnt">2</span></div>
+      <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H8a2 2 0 0 0-2 2v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a2 2 0 0 0 2 2h2"/><path d="M14 4h2a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a2 2 0 0 1-2 2h-2"/></svg>编码/解码类工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5H6a2 2 0 0 0-2 2v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a2 2 0 0 0 2 2h2"/><path d="M16 5h2a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a2 2 0 0 1-2 2h-2"/></svg>格式化类工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 13.8 8.4 19 10.2 13.8 12 12 17.2 10.2 12 5 10.2 10.2 8.4z"/><path d="M18.6 16.2 19.4 18.4 21.6 19.2 19.4 20 18.6 22.2 17.8 20 15.6 19.2 17.8 18.4z"/></svg>生成类工具<span class="cnt">2</span></div>
+      <div class="sb-item" style="background:var(--hover)"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7V5h14v2"/><path d="M12 5v14"/><path d="M9 19h6"/></svg>文本处理类工具<span class="cnt">2</span></div>
+      <div class="sb-sub">
+        <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h7"/></svg>文本处理</div>
+        <div class="sb-item active"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="7.5" height="15" rx="1.5"/><rect x="13.5" y="4.5" width="7.5" height="15" rx="1.5"/><path d="M12 3v18"/></svg>文本对比</div>
+      </div>
+      <div class="sb-item new"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3.5 12h17"/></svg>网络请求类工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="M3.5 17.5 9 13l4 3.2 3-2.4 4.5 3.7"/></svg>图片处理类工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 0 1 2-2h4l2 2.2h8a2 2 0 0 1 2 2v7.8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>文件处理类工具<span class="cnt">1</span></div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="cn">
+      <div class="pg-head">
+        <span class="back"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>返回</span>
+        <h1>文本对比</h1>
+        <p class="cap">文本处理类工具 · 文本对比</p>
+      </div>
+
+      <!-- 工具条：粒度 + 忽略规则 + 同步滚动 -->
+      <div class="bar">
+        <div class="seg"><span>按行</span><span class="on">按词</span><span>按字符</span></div>
+        <label class="chk on"><span class="bx"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>忽略空白</label>
+        <label class="chk"><span class="bx"></span>忽略大小写</label>
+        <label class="chk"><span class="bx"></span>忽略空行</label>
+        <div class="right">
+          <label class="chk on"><span class="bx"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>同步滚动</label>
+          <span class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h11l-3-3"/><path d="M17 16H6l3 3"/></svg>交换左右</span>
+        </div>
+      </div>
+
+      <!-- 三列 -->
+      <div class="region">
+        <!-- 原文 -->
+        <div class="pane">
+          <div class="pane-head"><span class="t">原文</span><span class="m">22 行</span></div>
+          <div class="code">
+            <div class="row"><span class="mk"></span><span class="ln">1</span><span class="tx"># 服务端配置</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">2</span><span class="tx">host = 127.0.0.1</span></div>
+            <div class="row mod cur"><span class="mk">~</span><span class="ln">3</span><span class="tx">port = <span class="w">8080</span></span></div>
+            <div class="row mod cur"><span class="mk">~</span><span class="ln">4</span><span class="tx">timeout = <span class="w">30</span></span></div>
+            <div class="row mod cur"><span class="mk">~</span><span class="ln">5</span><span class="tx">retry = <span class="w">3</span></span></div>
+            <div class="row mod cur"><span class="mk">~</span><span class="ln">6</span><span class="tx">log_level = <span class="w">info</span></span></div>
+            <div class="row"><span class="mk"></span><span class="ln">7</span><span class="tx">cache = false</span></div>
+            <div class="row ph"><span class="mk"></span><span class="ln"></span><span class="tx"></span></div>
+            <div class="row ph"><span class="mk"></span><span class="ln"></span><span class="tx"></span></div>
+            <div class="row"><span class="mk"></span><span class="ln">8</span><span class="tx">max_conn = 100</span></div>
+            <div class="row del"><span class="mk">−</span><span class="ln">9</span><span class="tx">db_pool = 10</span></div>
+            <div class="row mod"><span class="mk">~</span><span class="ln">10</span><span class="tx">worker = <span class="w">4</span></span></div>
+            <div class="row"><span class="mk"></span><span class="ln">11</span><span class="tx">enable_gzip = true</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">12</span><span class="tx">db_url = jdbc:mysql://127.0.0.1:3306/app</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">13</span><span class="tx">pool_min = 2</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">14</span><span class="tx">pool_max = 20</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">15</span><span class="tx">idle_timeout = 600</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">16</span><span class="tx">charset = utf8mb4</span></div>
+            <div class="row mod"><span class="mk">~</span><span class="ln">17</span><span class="tx">ssl_mode = <span class="w">disable</span></span></div>
+            <div class="row"><span class="mk"></span><span class="ln">18</span><span class="tx">read_only = false</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">19</span><span class="tx">slow_query_ms = 500</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">20</span><span class="tx">slow_log = /var/log/slow.log</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">21</span><span class="tx">max_packet = 16M</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">22</span><span class="tx">net_read_timeout = 30</span></div>
+          </div>
+        </div>
+
+        <div class="div"></div>
+
+        <!-- 变更带 -->
+        <div class="band">
+          <div class="band-head">差异<span class="m">4 组</span></div>
+          <div class="stats">
+            <div class="st st-add"><span class="n">+2</span><span class="l">新增</span></div>
+            <div class="st st-mod"><span class="n">~6</span><span class="l">修改</span></div>
+            <div class="st st-del"><span class="n">−1</span><span class="l">删除</span></div>
+          </div>
+          <div class="map">
+            <div class="ruler"><span>1</span><span>12</span><span>24</span></div>
+            <div class="track">
+              <span class="seg mod cur" style="top:18px;width:100%"></span>
+              <span class="seg add" style="top:36px;width:50%"></span>
+              <span class="seg del" style="top:47px;width:25%"></span>
+              <span class="seg mod" style="top:83px;width:25%"></span>
+            </div>
+          </div>
+          <div class="dlist">
+            <div class="di cur">
+              <div class="top"><span class="no">#1</span><span class="tag mod">修改</span><span class="loc">第 3–6 行</span></div>
+              <div class="sum">port · timeout · retry…</div>
+            </div>
+            <div class="di">
+              <div class="top"><span class="no">#2</span><span class="tag add">新增</span><span class="loc">第 8–9 行</span></div>
+              <div class="sum">tls_enabled · cert_path</div>
+            </div>
+            <div class="di">
+              <div class="top"><span class="no">#3</span><span class="tag del">删除</span><span class="loc">左 9 行</span></div>
+              <div class="sum">db_pool = 10</div>
+            </div>
+            <div class="di">
+              <div class="top"><span class="no">#4</span><span class="tag mod">修改</span><span class="loc">第 19 行</span></div>
+              <div class="sum">ssl_mode → require</div>
+            </div>
+          </div>
+          <div class="band-foot">条长 = 该组变更行数 · 点条目跳转</div>
+        </div>
+
+        <div class="div"></div>
+
+        <!-- 修改后 -->
+        <div class="pane">
+          <div class="pane-head"><span class="t">修改后</span><span class="m">23 行</span></div>
+          <div class="code">
+            <div class="row"><span class="mk"></span><span class="ln">1</span><span class="tx"># 服务端配置</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">2</span><span class="tx">host = 127.0.0.1</span></div>
+            <div class="row mod cur"><span class="mk">~</span><span class="ln">3</span><span class="tx">port = <span class="w a">9090</span></span></div>
+            <div class="row mod cur"><span class="mk">~</span><span class="ln">4</span><span class="tx">timeout = <span class="w a">60</span></span></div>
+            <div class="row mod cur"><span class="mk">~</span><span class="ln">5</span><span class="tx">retry = <span class="w a">5</span></span></div>
+            <div class="row mod cur"><span class="mk">~</span><span class="ln">6</span><span class="tx">log_level = <span class="w a">debug</span></span></div>
+            <div class="row"><span class="mk"></span><span class="ln">7</span><span class="tx">cache = false</span></div>
+            <div class="row add"><span class="mk">+</span><span class="ln">8</span><span class="tx">tls_enabled = true</span></div>
+            <div class="row add"><span class="mk">+</span><span class="ln">9</span><span class="tx">cert_path = /etc/ssl/app.pem</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">10</span><span class="tx">max_conn = 100</span></div>
+            <div class="row ph"><span class="mk"></span><span class="ln"></span><span class="tx"></span></div>
+            <div class="row mod"><span class="mk">~</span><span class="ln">11</span><span class="tx">worker = <span class="w a">8</span></span></div>
+            <div class="row"><span class="mk"></span><span class="ln">12</span><span class="tx">enable_gzip = true</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">13</span><span class="tx">db_url = jdbc:mysql://127.0.0.1:3306/app</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">14</span><span class="tx">pool_min = 2</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">15</span><span class="tx">pool_max = 20</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">16</span><span class="tx">idle_timeout = 600</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">17</span><span class="tx">charset = utf8mb4</span></div>
+            <div class="row mod"><span class="mk">~</span><span class="ln">18</span><span class="tx">ssl_mode = <span class="w a">require</span></span></div>
+            <div class="row"><span class="mk"></span><span class="ln">19</span><span class="tx">read_only = false</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">20</span><span class="tx">slow_query_ms = 500</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">21</span><span class="tx">slow_log = /var/log/slow.log</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">22</span><span class="tx">max_packet = 16M</span></div>
+            <div class="row"><span class="mk"></span><span class="ln">23</span><span class="tx">net_read_timeout = 30</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部状态条 -->
+      <div class="foot">
+        <span class="mono">原文 22 行 · 486 字符　|　修改后 23 行 · 512 字符　|　差异 4 处</span>
+        <div class="right">
+          <span class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7l-5 5 5 5"/></svg>上一处</span>
+          <span class="pos">第 1 / 4 处</span>
+          <span class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 7l5 5-5 5"/></svg>下一处</span>
+          <span class="sep"></span>
+          <span class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制差异</span>
+          <span class="btn sm danger"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg>清空</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><i style="background:#eaf6ef;border-color:#c8e9d6"></i>新增行底 <code>#eaf6ef</code> + 绿条 + <code>+</code></span>
+    <span><i style="background:#fdf7ec;border-color:#fbe6c8"></i>修改行底 <code>#fdf7ec</code> + 双色条 + <code>~</code></span>
+    <span><i style="background:#fdeeee;border-color:#f7d2d3"></i>删除行底 <code>#fdeeee</code> + 红条 + <code>−</code></span>
+    <span><i style="background:repeating-linear-gradient(45deg,#f7f9fb 0 4px,#eef1f5 4px 8px)"></i>无对应行的斜纹占位行</span>
+    <span><i style="background:#eaf0fe;border-color:#b8cdfb"></i>当前差异组的行号列</span>
+  </div>
+
+  <div class="kv-tip">
+    <b>看这三处，就知道它和双栏 diff 不是同一件事：</b>
+    ① 中间列顶部的 <code>+2 / ~6 / −1</code> 让「这次改动有多少」在滚都不滚的情况下先说清楚；
+    ② 中间的**变更密度图**：纵向位置 = 在文档中的位置，横向条长 = 该组变更的行数 —— 一眼看出「改动集中在开头，后面只有零星几处」；当前组（#1）带一圈主色细环；
+    ③ 中间的清单是**可以点的**，点第 3 项「删除 · 左 9 行」，两侧会一起滚到那一行，行号列转主色。
+  </div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section>
+  <h2><span class="idx">02</span>差异的四种展现（放大 1.6 倍细看）</h2>
+  <p class="lead">
+    三类差异各用一条「底 + 左缘条 + gutter 标记」的三重线索，词级再叠一层文字装饰。
+    关键取舍：**正文一律保持 <code>-dt-text</code>（≈17:1），颜色只出现在行底、左缘条、gutter 标记这三处**。
+    大面积文本着色会让整页变成彩纸，长时间阅读时反而不如黑白清楚 —— 差异是靠位置与标记读出来的，不是靠颜色读出来的。
+  </p>
+
+  <div class="zoom-grid">
+    <div class="zcard">
+      <h4><span class="pill no">删除</span>只存在于原文的行</h4>
+      <p class="why">整行是「被拿掉的东西」，站在原文这一侧才有意义。</p>
+      <div class="zcode">
+        <div class="row del"><span class="mk">−</span><span class="ln">9</span><span class="tx">db_pool = 10</span></div>
+        <div class="row ph"><span class="mk"></span><span class="ln"></span><span class="tx"></span></div>
+      </div>
+      <ul>
+        <li>行底 <code>#fdeeee</code>，左缘 3px <code>-dt-danger</code> <b>实心竖条</b></li>
+        <li>gutter 标记 <code>−</code>，行号 <b>加粗转危险色</b>（不只靠底色）</li>
+        <li>对应的修改后一侧补一条**斜纹占位行**：行数对得上，横向扫视才不会错位</li>
+        <li>文字不加删除线 —— 删除线留给词级，行级用条与标记已经够</li>
+      </ul>
+    </div>
+
+    <div class="zcard">
+      <h4><span class="pill ok">新增</span>只存在于修改后的行</h4>
+      <p class="why">与删除完全对偶，只是换了色相与标记 —— 学一次就会用。</p>
+      <div class="zcode">
+        <div class="row ph"><span class="mk"></span><span class="ln"></span><span class="tx"></span></div>
+        <div class="row add"><span class="mk">+</span><span class="ln">8</span><span class="tx">tls_enabled = true</span></div>
+      </div>
+      <ul>
+        <li>行底 <code>#eaf6ef</code>，左缘 3px <code>-dt-success</code> 实心竖条</li>
+        <li>gutter 标记 <code>+</code>，行号加粗转成功色</li>
+        <li>新增行**不写删除线也不写下划线**：它是纯粹的「多出来的」，没有可对比的旧值</li>
+        <li>行数变化时，原文一侧自动补占位行（图为原文侧）</li>
+      </ul>
+    </div>
+
+    <div class="zcard">
+      <h4><span class="pill warn">修改</span>两侧成对、行内改了几处</h4>
+      <p class="why">最难表达的一类：不是「多了一行」也不是「少了一行」，而是一行被换掉了内容。</p>
+      <div class="zcode">
+        <div class="row mod"><span class="mk">~</span><span class="ln">3</span><span class="tx">port = <span class="w">8080</span></span></div>
+        <div class="row mod"><span class="mk">~</span><span class="ln">3</span><span class="tx">port = <span class="w a">9090</span></span></div>
+      </div>
+      <ul>
+        <li>行底换成中性的 <code>#fdf7ec</code>（不偏红也不偏绿），左缘用 <b>上红下绿的双色条</b> —— 一眼看出「这一行两端都动过」</li>
+        <li>gutter 标记 <code>~</code>，行号加粗转警告色</li>
+        <li>行内再把词级差异叠上去：左侧旧值 <b>删除线</b> + 淡红底，右侧新值 <b>下划线</b> + 淡绿底</li>
+        <li>删除线 vs 下划线是两种<b>形状</b>而不是两种颜色 —— 色觉障碍用户与黑白截图里同样读得出</li>
+        <li>只有把「行级配对」做出来，修改才可能是一种独立展现；否则它会被拆成一对删除 + 新增，三态退化成两态（见 §6）</li>
+      </ul>
+    </div>
+
+    <div class="zcard">
+      <h4><span class="pill" style="color:#5a6169;background:#e7eaef">视口外</span>当前看不见的那一组</h4>
+      <p class="why">长文本时，差异清单与变更地图存在的全部理由：把「屏幕外面还有东西」说清楚。</p>
+      <div style="display:flex;gap:14px;align-items:flex-start;margin:4px 0 2px">
+        <div style="width:150px;flex:0 0 150px;position:relative;height:132px;border-left:1px solid var(--border-faint)">
+          <span style="position:absolute;left:0;top:10px;width:100%;height:8px;border-radius:0 3px 3px 0;background:var(--warning)"></span>
+          <span style="position:absolute;left:0;top:40px;width:50%;height:8px;border-radius:0 3px 3px 0;background:var(--success)"></span>
+          <span style="position:absolute;left:0;top:88px;width:50%;height:8px;border-radius:0 3px 3px 0;background:var(--success)"></span>
+          <span style="position:absolute;left:0;top:112px;width:25%;height:8px;border-radius:0 3px 3px 0;background:var(--danger)"></span>
+          <span style="position:absolute;left:-4px;right:-4px;top:0;height:62%;border:1.5px solid var(--accent);background:rgba(37,99,235,.06);border-radius:5px"></span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="di" style="border:1px solid var(--border-faint);border-radius:8px;padding:8px 10px 8px 12px">
+            <div class="top"><span class="no">#26</span><span class="tag add">新增</span><span class="loc">第 402 行</span></div>
+            <div class="sum">tls_ciphers = TLS_AES_256…</div>
+          </div>
+          <div class="note" style="margin-top:8px">
+            主色细框 = <b>当前视口</b>覆盖率（这里 62%），框外的条就是「往下滚才看得到」的差异。
+            内容没超出视口时，这个框等于整根轨道，画出来只是给轨道套了个圈 → <b>此时不画</b>。
+          </div>
+        </div>
+      </div>
+      <ul style="margin-top:10px">
+        <li>变更图只画条不画文字：它是<b>索引</b>，不是缩略图；文字缩略在 220px 宽里只会变成一片灰噪点</li>
+        <li>左侧 1 / 12 / 24 是行号刻度，让条的位置能被读出数量级</li>
+        <li>清单里属于当前组的项高亮为浅主色 + 左缘 2px 主色条</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section>
+  <h2><span class="idx">03</span>状态：空、无差异、差异过多</h2>
+  <p class="lead">
+    空态的分工沿用既有规则：<b>可输入区域内部用 promptText，整块内容区用空状态组件</b>。
+    所以两侧文本框里是占位提示文字，中间那条变更带才是居中的空状态。
+  </p>
+
+  <div class="miniwrap">
+    <!-- 空输入 -->
+    <div class="mini">
+      <div class="slot"><div class="scale">
+        <div class="win" style="width:998px;height:535px;border:0;border-radius:0">
+          <div class="cn" style="background:var(--content-bg)">
+            <div class="bar">
+              <div class="seg"><span class="on">按行</span><span>按词</span><span>按字符</span></div>
+              <label class="chk"><span class="bx"></span>忽略空白</label>
+              <label class="chk"><span class="bx"></span>忽略大小写</label>
+              <div class="right"><label class="chk on"><span class="bx"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>同步滚动</label></div>
+            </div>
+            <div class="region">
+              <div class="pane"><div class="pane-head"><span class="t">原文</span><span class="m">0 行</span></div>
+                <div class="code"><div class="row"><span class="mk"></span><span class="ln"></span><span class="tx ph-text">在此粘贴或拖入原文…</span></div></div>
+              </div>
+              <div class="div"></div>
+              <div class="band">
+                <div class="band-head">差异</div>
+                <div class="empty">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="7.5" height="15" rx="1.5"/><rect x="13.5" y="4.5" width="7.5" height="15" rx="1.5"/><path d="M12 3v18"/></svg>
+                  <div class="t">填入两侧文本后显示差异</div>
+                  <div class="s">支持拖入 .txt / .md / .java 等文本文件<br>两侧内容一致时会明确告诉你「一致」</div>
+                </div>
+              </div>
+              <div class="div"></div>
+              <div class="pane"><div class="pane-head"><span class="t">修改后</span><span class="m">0 行</span></div>
+                <div class="code"><div class="row"><span class="mk"></span><span class="ln"></span><span class="tx ph-text">在此粘贴或拖入修改后的文本…</span></div></div>
+              </div>
+            </div>
+            <div class="foot">
+              <span class="mono">原文 0 行 · 0 字符　|　修改后 0 行 · 0 字符</span>
+              <div class="right"><span class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 19h14"/></svg>载入文件</span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="cap"><b>① 尚未输入</b>：中间栏用统一空状态（26px 线性图标 + 主文案 + 次文案），两侧用 promptText。底部只给一个「载入文件」入口（次操作级）。</div>
+    </div>
+
+    <!-- 无差异 -->
+    <div class="mini">
+      <div class="slot"><div class="scale">
+        <div class="win" style="width:998px;height:535px;border:0;border-radius:0">
+          <div class="cn" style="background:var(--content-bg)">
+            <div class="bar">
+              <div class="seg"><span class="on">按行</span><span>按词</span><span>按字符</span></div>
+              <label class="chk on"><span class="bx"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>忽略空白</label>
+              <label class="chk on"><span class="bx"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>忽略大小写</label>
+              <div class="right"><label class="chk on"><span class="bx"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>同步滚动</label></div>
+            </div>
+            <div class="region">
+              <div class="pane"><div class="pane-head"><span class="t">原文</span><span class="m">6 行</span></div>
+                <div class="code">
+                  <div class="row"><span class="mk"></span><span class="ln">1</span><span class="tx">host = 127.0.0.1</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">2</span><span class="tx">timeout = 30</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">3</span><span class="tx">retry = 3</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">4</span><span class="tx">LOG_LEVEL = info</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">5</span><span class="tx">cache = false</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">6</span><span class="tx">worker = 4</span></div>
+                </div>
+              </div>
+              <div class="div"></div>
+              <div class="band">
+                <div class="band-head">差异<span class="m">0 组</span></div>
+                <div class="empty ok">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.8 2.8L16.4 9.6"/></svg>
+                  <div class="t">两侧内容一致</div>
+                  <div class="s">按当前规则（忽略空白、忽略大小写）<br>逐行比对 6 行，未发现差异</div>
+                </div>
+              </div>
+              <div class="div"></div>
+              <div class="pane"><div class="pane-head"><span class="t">修改后</span><span class="m">6 行</span></div>
+                <div class="code">
+                  <div class="row"><span class="mk"></span><span class="ln">1</span><span class="tx">host = 127.0.0.1</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">2</span><span class="tx">Timeout=30</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">3</span><span class="tx">retry = 3</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">4</span><span class="tx">log_level = INFO</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">5</span><span class="tx">cache = false</span></div>
+                  <div class="row"><span class="mk"></span><span class="ln">6</span><span class="tx">worker = 4</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="foot">
+              <span class="mono">原文 6 行 · 88 字符　|　修改后 6 行 · 84 字符　|　差异 0 处</span>
+              <div class="right">
+                <span class="btn sm" style="opacity:.45"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7l-5 5 5 5"/></svg>上一处</span>
+                <span class="pos">— / 0</span>
+                <span class="btn sm" style="opacity:.45"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 7l5 5-5 5"/></svg>下一处</span>
+                <span class="sep"></span>
+                <span class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制差异</span>
+                <span class="btn sm danger"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg>清空</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="cap"><b>② 两侧一致</b>：中列明确说「一致」而不是留一片空白 —— 空白会被读成「还没算」。底部统计写 <code>差异 0 处</code>，两组导航按钮置灰而非隐藏（保住按钮列的对齐）。<br>这里的示例很关键：两侧其实有 <code>timeout = 30 / Timeout=30</code>、<code>LOG_LEVEL / log_level</code> 两处字面差异，被「忽略空白 + 忽略大小写」吸收掉了 —— 所以「一致」的结论必须写明是<b>按当前规则</b>得出的。</div>
+    </div>
+  </div>
+
+  <h3 class="sub">③ 差异过多时的降级（大文本）</h3>
+  <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+    <div style="width:300px;flex:0 0 300px">
+      <div class="band" style="width:300px;height:210px;border-radius:8px">
+        <div class="band-head">差异<span class="m">1,240 组</span></div>
+        <div class="stats">
+          <div class="st st-add"><span class="n">+812</span><span class="l">新增</span></div>
+          <div class="st st-mod"><span class="n">~364</span><span class="l">修改</span></div>
+          <div class="st st-del"><span class="n">−64</span><span class="l">删除</span></div>
+        </div>
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 21 19H3z"/><path d="M12 10v4"/><path d="M12 16.8v.2"/></svg>
+          差异较多，仅列出前 200 组。用「下一处」仍可逐组走完，也可以在两侧直接读高亮。
+        </div>
+        <div class="dlist" style="border-top:1px solid var(--border-faint)">
+          <div class="di cur">
+            <div class="top"><span class="no">#1</span><span class="tag mod">修改</span><span class="loc">第 3–6 行</span></div>
+            <div class="sum">port · timeout · retry · log_level</div>
+          </div>
+          <div class="di">
+            <div class="top"><span class="no">#2</span><span class="tag add">新增</span><span class="loc">第 8–9 行</span></div>
+            <div class="sum">tls_enabled · cert_path</div>
+          </div>
+          <div class="di">
+            <div class="top"><span class="no">#3</span><span class="tag del">删除</span><span class="loc">左 9 行</span></div>
+            <div class="sum">db_pool = 10</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="flex:1;min-width:300px">
+      单侧超过 <b>20000 行或 2MB</b> 时切换到这个形态，三件事同时发生：<br>
+      1. 输入不再防抖实算，改为<b>手动点「开始对比」</b>（此时它是全页唯一的主色实底按钮，符合「一屏一个主色」）；<br>
+      2. 清单只列前 200 组，顶部给一条 <code>-dt-warning</code> 提示条说明截断 —— <b>截断必须是被知道的</b>，否则用户会以为差异只有 200 处；<br>
+      3. 统计数字仍然给全量（<code>+812 / ~364 / −64</code>），因为算计数不需要渲染。<br>
+      <span style="color:#8b929c">提示条的图标用 warning 三角，不单靠底色传严重度 —— 沿用既有 notice 规范。</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section>
+  <h2><span class="idx">04</span>设计规范</h2>
+
+  <h3 class="sub">A. 新增令牌（差异域，加在 <code>app.css</code> 的 <code>.root</code> 里）</h3>
+  <table>
+    <thead><tr><th style="width:190px">令牌</th><th style="width:110px">值</th><th style="width:150px">用途</th><th>为什么</th></tr></thead>
+    <tbody>
+      <tr><td><code>-dt-diff-add-bg</code></td><td><span class="swatch" style="background:#eaf6ef"></span><code>#eaf6ef</code></td><td>新增行底</td><td>成功色的浅底版。与白底差异约 5%，够看见又不压过正文</td></tr>
+      <tr><td><code>-dt-diff-add-word</code></td><td><span class="swatch" style="background:#c8e9d6"></span><code>#c8e9d6</code></td><td>新增词底</td><td>必须比行底<b>再深一档</b>，否则行内词级差异在一行里看不出来</td></tr>
+      <tr><td><code>-dt-diff-del-bg</code></td><td><span class="swatch" style="background:#fdeeee"></span><code>#fdeeee</code></td><td>删除行底</td><td>与 <code>-dt-danger-soft</code> 同族，略作提亮以免与错误提示条混淆</td></tr>
+      <tr><td><code>-dt-diff-del-word</code></td><td><span class="swatch" style="background:#f7d2d3"></span><code>#f7d2d3</code></td><td>删除词底</td><td>同上</td></tr>
+      <tr><td><code>-dt-diff-mod-bg</code></td><td><span class="swatch" style="background:#fdf7ec"></span><code>#fdf7ec</code></td><td>修改行底</td><td>暖中性色，既不是红也不是绿 —— 修改既不是「多了」也不是「没了」</td></tr>
+      <tr><td><code>-dt-diff-mod-word</code></td><td><span class="swatch" style="background:#fbe6c8"></span><code>#fbe6c8</code></td><td>修改词底（可选）</td><td>粒度选「按词」时，未配对的零散词用这档；成对替换仍用上面两个词底</td></tr>
+      <tr><td><code>-dt-diff-gutter</code></td><td><span class="swatch" style="background:#f4f6f9"></span><code>#f4f6f9</code></td><td>行号列底</td><td>比 <code>-dt-surface-alt</code> 略沉，把「行号」与「正文」分开，但不形成第二张卡片的边界</td></tr>
+      <tr><td colspan="4" style="color:#5a6169">左缘 3px 色条与 gutter 标记<b>不新增令牌</b>，直接引用 <code>-dt-success</code> / <code>-dt-danger</code> / <code>-dt-warning</code>：这三个色对白底的对比度都在 5:1 以上，远超非文本图形 3:1 的门槛，换主题时也会跟着走。</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">B. 尺寸与字号</h3>
+  <table>
+    <thead><tr><th style="width:180px">项</th><th style="width:240px">值</th><th>依据</th></tr></thead>
+    <tbody>
+      <tr><td>三列宽度</td><td>左/右各 <b>flex 1</b>；中列<b>固定 220px</b></td><td>220px 是「索引栏」的宽度上限，再宽就会与正文抢注意力；拖动范围 180–300px，也可折叠为 44px 的纯密度图条</td></tr>
+      <tr><td>列间分隔</td><td>1px <code>-dt-border</code>，可拖动</td><td>沿用 <code>.split-pane</code>：静止无把手，悬停才显形</td></tr>
+      <tr><td>面板</td><td>圆角 8px + 1px <code>-dt-border-strong</code></td><td>强描边用于「需要被识别的输入边界」，与输入框同级</td></tr>
+      <tr><td>面板头</td><td>高 <b>38px</b>；标题 12.5px 粗体；右侧行数等宽 11.5px <code>-dt-text-subtle</code></td><td>标题只写「原文 / 修改后」两个词，不放按钮 —— 动作统一在工具条与底部</td></tr>
+      <tr><td>代码区</td><td>等宽 12.5px / 行高 <b>20px</b></td><td>与 <code>.json-code-area</code> 同字号。行高 20px 是「一屏读到 24 行以上」与「不挤」的平衡点</td></tr>
+      <tr><td>行号列</td><td>标记 15px + 行号 34px，右对齐</td><td>行号位数变化时列宽不抖（等宽字体下 4 位数字 + 内边距）</td></tr>
+      <tr><td>工具条</td><td>控件 32px，上下内边距 11 / 12px</td><td>控件高度阶梯「标准」档；本页没有 36px 的强调带（没有表单输入行）</td></tr>
+      <tr><td>差异清单项</td><td>高约 <b>46px</b>（两行：序号+类型+位置 / 摘要）</td><td>摘要是等宽单行截断，长标识符靠 tooltip 兜底</td></tr>
+      <tr><td>变更图</td><td>高 <b>132px</b>；每条 <b>8px</b> 高圆角条，条长 = 该组变更行数</td><td>密度可读的下限：低于 100px 时相邻差异会粘成一团；条长让「哪一组动得最多」不必读数字</td></tr>
+      <tr><td>内容区留白</td><td>左右 24px，与页头一致</td><td>沿用既有规范，标题与正文左边缘必须对齐</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">C. 四类差异的线索矩阵（对照 DESIGN.md「颜色永不是唯一线索」）</h3>
+  <table>
+    <thead><tr><th style="width:90px">语义</th><th style="width:110px">行底</th><th style="width:150px">左缘条 3px</th><th style="width:90px">gutter</th><th style="width:110px">行号</th><th>词级装饰</th></tr></thead>
+    <tbody>
+      <tr><td><b>新增</b></td><td><code>#eaf6ef</code></td><td><code>-dt-success</code> 实心</td><td><code>+</code></td><td>加粗·成功色</td><td>淡绿底 + <b>下划线</b></td></tr>
+      <tr><td><b>删除</b></td><td><code>#fdeeee</code></td><td><code>-dt-danger</code> 实心</td><td><code>−</code></td><td>加粗·危险色</td><td>淡红底 + <b>删除线</b></td></tr>
+      <tr><td><b>修改</b></td><td><code>#fdf7ec</code></td><td><b>上红下绿双色</b></td><td><code>~</code></td><td>加粗·警告色</td><td>两侧分别为删除线 / 下划线</td></tr>
+      <tr><td><b>当前组</b></td><td>不变</td><td>不变</td><td>底转 <code>-dt-accent-soft</code></td><td><code>-dt-accent</code> 加粗</td><td>跳转时该组闪烁一次 140ms 主色浅底</td></tr>
+      <tr><td><b>视口外</b></td><td colspan="5">不画在文本上。由中列的变更图与清单条目表达（见 §2 第四张卡）</td></tr>
+    </tbody>
+  </table>
+  <div class="kv-tip">
+    <b>「当前组」为什么不改行底：</b>行底已经承载了「类型」这一层语义，再叠一层「当前」会让同一行同时说两件事，且两套颜色会互相干扰。
+    于是把「当前」放到<b>中性区</b>——行号列，它是唯一一个不带类型语义的位置。这与侧边栏「所有工具」用浅底 + 色条而不用实底是同一个思路：位置指示的重量要低于内容本身。
+  </div>
+
+  <h3 class="sub">D. 交互与可达性</h3>
+  <table>
+    <thead><tr><th style="width:150px">交互</th><th>行为</th></tr></thead>
+    <tbody>
+      <tr><td>实时对比</td><td>任一侧文本变化 → <b>250ms 防抖</b>后重算；重算<b>不改变滚动位置</b>，也不抢焦点</td></tr>
+      <tr><td>同步滚动</td><td>默认开（按对齐行映射，占位行不参与映射）；可关，关闭后两侧各滚各的</td></tr>
+      <tr><td>跳转</td><td>单击清单项 / 「上一处 · 下一处」/ 键盘 <code>F7</code> · <code>Shift+F7</code> → 两侧滚到该组，行号转主色并闪烁一次</td></tr>
+      <tr><td>交换左右</td><td>一键互换两侧内容与全部差异状态（工具条右侧，静默按钮级）</td></tr>
+      <tr><td>复制差异</td><td>复制标准补丁文本（<code>--- 原文</code> / <code>+++ 修改后</code> / <code>@@</code> 段头），可直接喂给 <code>patch</code></td></tr>
+      <tr><td>清空</td><td>破坏性动作，用危险色描边按钮；清空两侧文本与全部差异状态</td></tr>
+      <tr><td>大文本降级</td><td>单侧 &gt; 20000 行或 2MB：改为手动触发 + 清单截断到 200 组 + 提示条说明</td></tr>
+      <tr><td>键盘路径</td><td>Tab 依次：工具条 → 原文 → 中列清单 → 修改后 → 底部；所有按钮均可 Tab 聚焦且焦点可见</td></tr>
+      <tr><td>对比度</td><td>正文一律 <code>-dt-text</code>（对白底 ≈17:1）；行底与白底差异约 5%，不做文字层；色条取语义色原值（≥5:1）</td></tr>
+      <tr><td>未验证项</td><td><span class="pill warn">待办</span> 词级底色 <code>#c8e9d6</code> / <code>#f7d2d3</code> 上叠 <code>-dt-text</code> 的对比度未用工具实测；200% 文本缩放、色觉障碍模拟、820px 最小窗口下的三列压缩，均未实测 —— 作为实现阶段的验收项，不要当成已通过</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ 5 -->
+<section>
+  <h2><span class="idx">05</span>关键决策：为什么是这样</h2>
+  <table>
+    <thead><tr><th style="width:260px">决策</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>中间列不显示第三份文本</b></td>
+        <td>三份文本会让人在三列之间来回对照，眼睛要做两次跳转。判断「这处改得对不对」的锚点永远在原文与结果上，所以差异必须画在两侧的行上；中间列只回答三个问题：<b>有多少 · 在哪里 · 是什么</b>。这是三列能比双列多给出东西的唯一理由。</td>
+      </tr>
+      <tr>
+        <td><b>把「修改」做成独立的第三类</b></td>
+        <td>纯行级 diff 会把 <code>port = 8080 → 9090</code> 拆成一删一增，屏幕上同时出现红行与绿行，用户得自己判断它们是不是同一行。做一次<b>行级配对 + 行内词级比对</b>，把它合成一个「修改」态，三类差异才真正可区分 —— 这也是「新增/修改/删除分别用不同展现」能够成立的前提。</td>
+      </tr>
+      <tr>
+        <td><b>正文不着色</b></td>
+        <td>颜色只出现在行底、左缘条、gutter 标记三处。大面积文本着色会让整页变成彩纸，长时间阅读时反而不如黑白清楚；且改为「位置 + 标记」表达后，色觉障碍用户与灰度截图里同样读得出差异。与既有纪律「颜色永不是唯一线索」一致。</td>
+      </tr>
+      <tr>
+        <td><b>修改行底用暖中性色 + 双色条</b></td>
+        <td>红与绿在本页已经分别代表「没了」和「多了」。修改既不是多了也不是没了，用第三种底色；左缘条上红下绿，一眼看出「这一行两端都动过」。若给它一个红底或绿底，用户会误判成单纯的删除或新增。</td>
+      </tr>
+      <tr>
+        <td><b>缺失一侧必须有斜纹占位行</b></td>
+        <td>两侧行数不等时若不补行，下面的所有行都会错位，横向扫视彻底失效。占位行用斜纹而不是留白：留白会被读成「这里本来就空着」，斜纹明确表示「这一侧没有对应行」。</td>
+      </tr>
+      <tr>
+        <td><b>变更图是「密度图」而不是「缩略图」</b></td>
+        <td>只画条、不画文字缩略 —— 220px 宽度下文字缩略只能变成一片灰噪点。编码两件事就够：<b>纵向位置 = 在文档中的位置，横向条长 = 该组变更的行数</b>。视口指示框只在内容超出视口时出现——100% 时它等价于整块区域本身，画出来只是套了个圈。</td>
+      </tr>
+      <tr>
+        <td><b>空态分两处</b></td>
+        <td>两侧是可输入区域 → 用 <code>promptText</code>（居中大图标会挡在用户马上要打字的地方）；中间列是整块内容区 → 用统一空状态组件。这条分工沿用既有规范，不新造规则。</td>
+      </tr>
+      <tr>
+        <td><b>工具条用内联 checkbox 而不是选项卡片</b></td>
+        <td>本页垂直空间要全部让给文本区（三列都需要高度），选项卡片会吃掉约 90px，等于少看 4 行。这是对既有「选项放卡片」做法的一次有意偏离，理由是页面形态不同：文本处理页是「上输入下输出」，本页是「三列并列」。</td>
+      </tr>
+      <tr>
+        <td><b>不新增第五种颜色</b></td>
+        <td>差异域的颜色全部来自既有的成功 / 警告 / 危险三色阶，只是取浅底与深色两种用法。加新色相会让整页的色相数量失控（对照禁忌项「给卡片墙加彩色图标底托」）。</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ 6 -->
+<section>
+  <h2><span class="idx">06</span>给实现的映射清单</h2>
+  <p class="lead">按项目的既有分层落位，界面不写 <code>setStyle()</code>，一切经 <code>UiKit</code> 与 <code>app.css</code>。</p>
+  <table>
+    <thead><tr><th style="width:280px">落位</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>features/diff/DiffOps.java</code><br><span class="note">纯逻辑，零 JavaFX</span></td>
+        <td>行级 Myers → 行级配对（相邻的 delete+add 且相似度 ≥ 阈值 → 判定为「修改」）→ 行内词级 LCS 求区间。<br>输出 <code>List&lt;DiffRow&gt;</code>（<code>kind = SAME/ADD/DEL/MOD</code>、左右行号、词级区间）与 <code>List&lt;DiffGroup&gt;</code>（组序号、类型、行区间、摘要、两端行号）。<br>忽略空白 / 忽略大小写 / 忽略空行都是<b>归一化后再比对</b>，但显示用原文。</td>
+      </tr>
+      <tr>
+        <td><code>features/diff/TextDiffModule.java</code></td>
+        <td>实现 <code>ToolModule</code>，在 <code>ToolRegistry.bootstrap()</code> 注册一行；分类归入「文本处理类工具」。不改 <code>Sidebar</code> / <code>ContentPane</code>。</td>
+      </tr>
+      <tr>
+        <td>新增 CSS 类</td>
+        <td><code>.diff-pane</code> <code>.diff-pane-head</code> <code>.diff-code</code> <code>.diff-row</code> <code>.diff-mk</code> <code>.diff-ln</code> <code>.diff-tx</code>；状态：<code>.diff-add</code> <code>.diff-del</code> <code>.diff-mod</code> <code>.diff-ph</code> <code>.diff-cur</code>；词级：<code>.diff-word-del</code> <code>.diff-word-add</code>；中列：<code>.diff-band</code> <code>.diff-stats</code> <code>.diff-map</code> <code>.diff-seg</code> <code>.diff-vp</code> <code>.diff-list</code> <code>.diff-item</code>。</td>
+      </tr>
+      <tr>
+        <td>JavaFX 实现三处细节</td>
+        <td>① 修改行的双色左缘条：一个 3px 宽的 <code>Region</code>，<code>-fx-background-color: -dt-danger, -dt-success</code> + <code>-fx-background-insets: 0 0 50% 0, 50% 0 0 0</code>；<br>② 斜纹占位行：<code>-fx-background-color</code> 叠两层线性渐变模拟 45° 斜纹（JavaFX 无 <code>repeating-linear-gradient</code>），或退化为 <code>-dt-surface-sunken</code> 纯色底 —— 两个方案都做进探针截图对比后取一；<br>③ 每行是固定 20px 的 <code>HBox</code>（<code>-fx-pref-height</code> 与 <code>-fx-min-height</code> <b>必须成对</b>），行内 <code>Label</code> 用 <code>FlowPane</code> 或者等宽 <code>TextFlow</code> 才能承载词级 span。</td>
+      </tr>
+      <tr>
+        <td>探针</td>
+        <td><code>verify.cmd diff</code>（纯逻辑）：三类归类、左右行号、词级区间、占位行对齐、三种忽略规则。<br><code>verify.cmd diffui</code>（界面级）：断言<b>三个计数互相咬合</b> ——「差异组数 == 中列清单条目数 == 变更图上的条数」，且「左栏行数 == 合并行中非新增行数」。任一处丢数据都会被这三条交叉断言抓到（参照 <code>qrlist</code> 对「不丢数据」的做法）。新增断言必须做反向验证。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">出图前想请你定的三件事</h3>
+  <ol class="q">
+    <li><b>粒度默认值</b>：图里默认「按词」（行级已配对的前提下，词级才有东西可标）。若你更关心整段结构变化，默认改成「按行」更安静 —— 两栏里只有行级高亮。</li>
+    <li><b>要不要「统一视图」（单列 unified diff）</b>：我倾向不做。三列已经把阅读方式固定成并排，再加一种视图会稀释它；但「复制差异」导出的仍是标准补丁格式，需要单列时去看补丁即可。</li>
+    <li><b>中列 220px 够不够</b>：如果你常在小窗口（≤ 1024px）里用，中列可以折叠成 44px 的纯密度图条，需要清单时再展开。要的话我出这一版的折叠状态图。</li>
+  </ol>
+</section>
+
+</div>
+</body>
+</html>

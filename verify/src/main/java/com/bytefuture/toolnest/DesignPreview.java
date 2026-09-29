@@ -6,12 +6,14 @@ import com.bytefuture.toolnest.features.http.HttpToolModule;
 import com.bytefuture.toolnest.features.json.JsonFormatModule;
 import com.bytefuture.toolnest.features.timestamp.TimestampModule;
 import com.bytefuture.toolnest.ui.shell.MainWindow;
+import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Scene;
 import javafx.scene.image.WritableImage;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import atlantafx.base.theme.PrimerLight;
 
 import javax.imageio.ImageIO;
@@ -122,9 +124,103 @@ public class DesignPreview {
         forceLayout(root);
         shoot(scene, "11-detail-text.png");
 
-        System.out.println("[preview] all shots done");
-        System.out.flush();
-        Platform.exit();
+        // 两栏并排：唯一「不以外壳为骨架」的界面，
+        // 两栏等宽分配、栏内各自滚动都只在这一页验证。
+        // 对比态要等一次 250ms 防抖重算才有内容，所以这一屏单独等一拍再截。
+        jump(root, "text-diff");
+        forceLayout(root);
+        fillDiffDemo(scene);
+        PauseTransition wait = new PauseTransition(Duration.millis(600));
+        wait.setOnFinished(e -> {
+            forceLayout(root);
+            try {
+                shoot(scene, "12-detail-diff.png");
+            } catch (Exception ex) {
+                System.out.println("[preview] diff shot failed: " + ex);
+            }
+            System.out.println("[preview] all shots done");
+            System.out.flush();
+            Platform.exit();
+        });
+        wait.play();
+    }
+
+    /** 两侧示例文本：左边是被改的服务端配置，右边是改后版本。 */
+    private static final String DIFF_LEFT = """
+            # 服务端配置
+            host = 127.0.0.1
+            port = 8080
+            timeout = 30
+            retry = 3
+            log_level = info
+            cache = false
+            max_conn = 100
+            db_pool = 10
+            worker = 4
+            enable_gzip = true
+            db_url = jdbc:mysql://127.0.0.1:3306/app
+            pool_min = 2
+            pool_max = 20
+            idle_timeout = 600
+            charset = utf8mb4
+            ssl_mode = disable
+            read_only = false
+            slow_query_ms = 500
+            slow_log = /var/log/slow.log
+            max_packet = 16M
+            net_read_timeout = 30
+            """;
+
+    private static final String DIFF_RIGHT = """
+            # 服务端配置
+            host = 127.0.0.1
+            port = 9090
+            timeout = 60
+            retry = 5
+            log_level = debug
+            cache = false
+            tls_enabled = true
+            cert_path = /etc/ssl/app.pem
+            max_conn = 100
+            worker = 8
+            enable_gzip = true
+            db_url = jdbc:mysql://127.0.0.1:3306/app
+            pool_min = 2
+            pool_max = 20
+            idle_timeout = 600
+            charset = utf8mb4
+            ssl_mode = require
+            read_only = false
+            slow_query_ms = 500
+            slow_log = /var/log/slow.log
+            max_packet = 16M
+            net_read_timeout = 30
+            """;
+
+    /**
+     * 往文本对比页两侧填入示例文本，让截图落在「对比态」而不是两个空输入框。
+     *
+     * <p>两侧都填上后界面<b>自己</b>会切到对比态 —— 走的就是用户路径，
+     * 不额外开后门去调内部方法。空界面截图验证不了行底配色与两栏对齐。
+     */
+    private void fillDiffDemo(Scene scene) {
+        javafx.scene.control.TextArea left = null;
+        javafx.scene.control.TextArea right = null;
+        for (javafx.scene.Node node : scene.getRoot().lookupAll(".diff-editor")) {
+            if (node instanceof javafx.scene.control.TextArea area) {
+                if (area.getStyleClass().contains("diff-editor-left")) {
+                    left = area;
+                } else if (area.getStyleClass().contains("diff-editor-right")) {
+                    right = area;
+                }
+            }
+        }
+        if (left == null || right == null) {
+            System.out.println("[preview] warning: 未找到两个对比输入区，截图将是空状态");
+            return;
+        }
+        left.setText(DIFF_LEFT);
+        right.setText(DIFF_RIGHT);
     }
 
     private void jump(MainWindow window, String moduleId) {

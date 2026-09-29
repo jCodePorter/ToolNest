@@ -71,6 +71,7 @@ public final class Icons {
                     + "M21 15l-4.5-4.5L5 21"),
             Map.entry("qr", "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h3v3h-3z "
                     + "M20 14v2 M14 20h3 M20 19v1"),
+            Map.entry("diff", "M4 4h6v16H4z M14 4h6v16h-6z M12 3v18"),
 
             // ---------- 分类图标 ----------
             Map.entry("switch", "M8 3L4 7l4 4 M4 7h16 M16 21l4-4-4-4 M20 17H4"),
@@ -115,6 +116,7 @@ public final class Icons {
             Map.entry("encode", "code"),
             Map.entry("uuid", "hash"),
             Map.entry("text-tools", "type"),
+            Map.entry("text-diff", "diff"),
             Map.entry("http", "globe"),
             Map.entry("file-hash", "file"),
             Map.entry("image-tools", "image"),

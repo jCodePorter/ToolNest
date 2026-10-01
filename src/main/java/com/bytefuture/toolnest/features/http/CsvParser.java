@@ -2,7 +2,6 @@ package com.bytefuture.toolnest.features.http;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -61,35 +60,17 @@ public final class CsvParser {
 
     /** 去掉字符串开头的 UTF-8 BOM（{@code U+FEFF}）。 */
     public static String stripBom(String text) {
-        if (text == null) {
-            return "";
-        }
-        return text.startsWith("\uFEFF") ? text.substring(1) : text;
+        return TextCodec.stripBom(text);
     }
 
     /**
-     * 猜测字符编码。
+     * 猜测字符编码：UTF-8 BOM 或严格 UTF-8 解码通过即 UTF-8，
+     * 否则回退 GBK（中文 Windows 下 Excel 另存 CSV 的默认编码）。
      *
-     * <p>策略：有 UTF-8 BOM 则用 UTF-8；否则按 UTF-8 严格解码试探，
-     * 成功即认为是 UTF-8；失败则回退 GBK（中文 Windows 下 Excel 另存 CSV 的默认编码）。
+     * <p>实现见 {@link TextCodec#detectCharset} —— HTTP 响应体解码用的是同一套策略。
      */
     public static Charset detectCharset(byte[] bytes) {
-        if (bytes.length >= 3
-                && (bytes[0] & 0xFF) == 0xEF
-                && (bytes[1] & 0xFF) == 0xBB
-                && (bytes[2] & 0xFF) == 0xBF) {
-            return StandardCharsets.UTF_8;
-        }
-        // 严格模式解码，遇到非法字节序列会抛异常（注意需用 CodingErrorAction.REPORT）
-        java.nio.charset.CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
-                .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
-                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
-        try {
-            decoder.decode(java.nio.ByteBuffer.wrap(bytes));
-            return StandardCharsets.UTF_8;
-        } catch (Exception notUtf8) {
-            return Charset.forName("GBK");
-        }
+        return TextCodec.detectCharset(bytes);
     }
 
     /** 解析 CSV 文本。首行作表头。 */

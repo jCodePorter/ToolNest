@@ -202,7 +202,15 @@ public class QrModuleProbe extends Application {
             module.decodeImageForTest(rect);
             double srcW = rect.getWidth();
             double srcH = rect.getHeight();
-            double scale = Math.min(460.0 / srcW, 460.0 / srcH);
+            // 【2026-10-01 修正】缩放上限不再是写死的 460，而是
+            // min(愿望值 460, 预览列**内容区**宽度)。内容区 = 列实宽 −
+            // 内边距 14×2 − 边框 1×2（见 .image-preview-holder）。
+            // 把动作行搬到页签行后左栏比原先窄，内容区可能低于 460；
+            // 此时仍按 460 算，得到的是「我以为的显示尺寸」，
+            // 与 JavaFX 实际渲染的尺寸分叉。所以断言必须按同一口径算期望值，
+            // 否则它守的是一个假约定。
+            double cap = Math.min(460.0, module.decodeContentWidthForTest());
+            double scale = Math.min(cap / srcW, 460.0 / srcH);
             double expW = srcW * scale;
             double expH = srcH * scale;
 

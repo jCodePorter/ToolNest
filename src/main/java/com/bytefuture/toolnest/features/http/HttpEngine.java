@@ -6,6 +6,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,8 +30,10 @@ public final class HttpEngine {
         public long elapsedMs;
         /** 响应头，大小写不敏感合并后的结果。 */
         public final Map<String, String> headers = new LinkedHashMap<>();
-        /** 响应体文本。 */
+        /** 响应体文本（已按响应声明的编码解码）。 */
         public String body = "";
+        /** 响应体的原始字节数 —— 展示「大小」要用它，不能拿文本重新按 UTF-8 估。 */
+        public int bodyBytes;
         /** 实际发出的最终 URL（替换占位符、合并 Params 之后）。 */
         public String finalUrl = "";
         /** 实际发出的请求体。 */
@@ -102,22 +106,61 @@ public final class HttpEngine {
                 }
             }
 
-            // 请求体
+            // 请求体：按类型分别组包。Content-Type 也在这里算出来 ——
+            // multipart 必须带上 boundary，只有这一层知道它是多少。
             HttpRequest.BodyPublisher publisher = HttpRequest.BodyPublishers.noBody();
+            String contentType = null;
             if (spec.hasBody()) {
-                result.requestBody = spec.body;
-                publisher = HttpRequest.BodyPublishers.ofString(spec.body, StandardCharsets.UTF_8);
-                if (spec.bodyType != HttpRequestSpec.BodyType.NONE
-                        && !hasHeader(result, headers, "Content-Type")) {
-                    builder.header("Content-Type", spec.bodyType.contentType() + "; charset=UTF-8");
+                switch (spec.bodyType) {
+                    case FORM_DATA -> {
+                        String boundary = MultipartBody.newBoundary();
+                        byte[] payload = MultipartBody.build(spec.formData, boundary);
+                        publisher = HttpRequest.BodyPublishers.ofByteArray(payload);
+                        contentType = spec.bodyType.contentType() + "; boundary=" + boundary;
+                        result.requestBody = MultipartBody.describe(
+                                spec.formData, boundary, payload.length);
+                    }
+                    case BINARY -> {
+                        Path path = Path.of(spec.binaryPath);
+                        publisher = HttpRequest.BodyPublishers.ofFile(path);
+                        contentType = spec.bodyType.contentType();
+                        result.requestBody = "（二进制文件 " + Files.size(path)
+                                + " 字节：" + spec.binaryPath + "）";
+                    }
+                    case FORM -> {
+                        // 原来这里什么都不做，界面上却写着「Form 会自动编码键值」——
+                        // 实测服务端收到的是原文。现在真的按
+                        // application/x-www-form-urlencoded 编码。
+                        String encoded = spec.formFields.isEmpty()
+                                ? spec.body                       // 批处理页的兼容路径
+                                : encodeForm(spec.formFields);
+                        result.requestBody = encoded;
+                        publisher = HttpRequest.BodyPublishers.ofString(
+                                encoded, StandardCharsets.UTF_8);
+                        contentType = spec.bodyType.contentType() + "; charset=UTF-8";
+                    }
+                    default -> {
+                        result.requestBody = spec.body;
+                        publisher = HttpRequest.BodyPublishers.ofString(
+                                spec.body, StandardCharsets.UTF_8);
+                        contentType = spec.bodyType.contentType() + "; charset=UTF-8";
+                    }
+                }
+                // 用户手设了 Content-Type 就以他的为准 —— 单一请求页会在类型工具行
+                // 把「与所选类型不一致」这件事说出来，但不替他改（自己改了更难排查）
+                if (contentType != null && !hasHeader(headers, "Content-Type")) {
+                    builder.header("Content-Type", contentType);
                 }
             }
 
             String method = spec.method.name();
             builder.method(method, publisher);
 
-            HttpResponse<String> response = CLIENT.send(builder.build(),
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            // 收字节而不是 String：编码交给 Content-Type 声明去决定。
+            // 直接 ofString(UTF_8) 会把不带 charset 的 GBK 响应整段解成乱码，
+            // 而中文接口不声明 charset 恰恰是常态。
+            HttpResponse<byte[]> response = CLIENT.send(builder.build(),
+                    HttpResponse.BodyHandlers.ofByteArray());
 
             result.status = response.statusCode();
             response.headers().map().forEach((k, v) -> {
@@ -125,13 +168,18 @@ public final class HttpEngine {
                     result.headers.put(k, String.join(", ", v));
                 }
             });
-            result.body = response.body() == null ? "" : response.body();
+            byte[] raw = response.body();
+            result.bodyBytes = raw == null ? 0 : raw.length;
+            result.body = TextCodec.decode(raw,
+                    response.headers().firstValue("Content-Type").orElse(null));
+            // 跟随重定向后 response.uri() 才是真正取到响应的地址；
+            // 原始请求地址只在「请求没发出去」时才有参考价值
+            if (response.uri() != null) {
+                result.finalUrl = response.uri().toString();
+            }
 
         } catch (Exception ex) {
             result.error = describe(ex);
-            if (result.body == null) {
-                result.body = "";
-            }
         } finally {
             result.elapsedMs = (System.nanoTime() - start) / 1_000_000;
         }
@@ -168,6 +216,13 @@ public final class HttpEngine {
         if (extra.length() == 0) {
             return base;
         }
+        // 查询串必须落在 fragment（#）之前，否则被拼到 # 后面会被当成锚点内容丢掉
+        int hash = base.indexOf('#');
+        if (hash >= 0) {
+            String head = base.substring(0, hash);
+            String tail = base.substring(hash);
+            return head + (head.contains("?") ? "&" : "?") + extra + tail;
+        }
         return base + (base.contains("?") ? "&" : "?") + extra;
     }
 
@@ -175,9 +230,31 @@ public final class HttpEngine {
         return value == null ? "" : URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-    private static boolean hasHeader(Result result,
-                                     List<Map.Entry<String, String>> headers,
-                                     String name) {
+    /**
+     * 把 FORM 的键值对拼成 {@code a=1&b=2} 的请求体。
+     *
+     * <p>用 {@link URLEncoder} 而不是自己按 RFC 3986 拼：本方法的产物带
+     * {@code Content-Type: application/x-www-form-urlencoded}，
+     * 而该媒体类型里空格就是 {@code +}（{@code %20} 是 RFC 3986 的说法，
+     * 两者混用会让服务端把 {@code +} 当成字面的加号）。非 ASCII 一律百分号转义，
+     * 所以「城市=北京 上海」发出去是
+     * {@code %E5%9F%8E%E5%B8%82=%E5%8C%97%E4%BA%AC+%E4%B8%8A%E6%B5%B7}。
+     */
+    static String encodeForm(List<Map.Entry<String, String>> fields) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> e : fields) {
+            if (e.getKey() == null || e.getKey().isBlank()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('&');
+            }
+            sb.append(encode(e.getKey().trim())).append('=').append(encode(e.getValue()));
+        }
+        return sb.toString();
+    }
+
+    private static boolean hasHeader(List<Map.Entry<String, String>> headers, String name) {
         if (headers != null) {
             for (Map.Entry<String, String> e : headers) {
                 if (e.getKey() != null && e.getKey().equalsIgnoreCase(name)) {

@@ -71,8 +71,13 @@ public class SelectionE2EProbe extends Application {
         root.applyCss();
         root.layout();
 
+        // 【2026-10-01 修正】缩放上限不再是写死的 460，而是
+        // min(愿望值 460, 预览列**内容区**实宽) —— 动作行搬到页签行后
+        // 左栏比原先窄，内容区可能低于 460。这里必须按同一口径算期望值，
+        // 否则探针守的是一个假约定（会假红，也会漏掉真问题）。
         double[] shown = com.bytefuture.toolnest.features.qrcode.QrModule
-                .displaySizePublic(img.getWidth(), img.getHeight());
+                .displaySizePublic(img.getWidth(), img.getHeight(),
+                        module.previewAvailableWidthPublic());
         double shownW = shown[0];
         double shownH = shown[1];
         double scale = shownW / img.getWidth();

@@ -461,7 +461,7 @@ final class DiffView {
                 + degradedNote());
         // 不能比对时复制一律置灰：一侧为空算出来的那一堆「删除」没有意义，
         // 还让用户能复制出去，只会把这层误导做实。
-        copyPatchButton.setDisable(true || !(readyToCompare() && !result.groups().isEmpty()));
+        copyPatchButton.setDisable(!(readyToCompare() && !result.groups().isEmpty()));
     }
 
     /**
@@ -470,9 +470,13 @@ final class DiffView {
      * <p>逐位比对给出的是<b>简化过的结论</b>（不做对齐，只按行号一对一对着看），
      * 不声明就是在拿简化的结果冒充精确结果：用户会以为「已经全对上了」。
      * 这是唯一还留在界面上的降级出口，所以宁可占几个字也不能省。
+     *
+     * <p>判定用 {@link DiffOps.Result#degraded()}，<b>不能</b>图省事写成
+     * 「两侧都填了就算降级」：那样退回小文本后这句话会粘住不放，用户会以为
+     * 后面看到的每个结论都被简化过，反而不信任本来精确算出来的结果。
      */
     private String degradedNote() {
-        return readyToCompare() && true
+        return result.degraded()
                 ? "\u3000|\u3000文本过大，已按行号逐位比对（不做对齐）"
                 : "";
     }

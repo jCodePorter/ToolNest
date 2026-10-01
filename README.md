@@ -62,14 +62,14 @@ package.cmd
 只需两步，**不用改任何界面代码** —— 侧边栏文件夹、宫格页、详情页都会自动生成：
 
 **1. 新建模块类**，实现 `ToolModule` 接口。例如新建
-`src/main/java/com/bytefuture/toolnest/modules/myfeature/MyFeatureModule.java`：
+`src/main/java/com/bytefuture/toolnest/features/myfeature/MyFeatureModule.java`：
 
 ```java
-package com.bytefuture.toolnest.modules.myfeature;
+package com.bytefuture.toolnest.features.myfeature;
 
 import com.bytefuture.toolnest.core.ModuleCategory;
-import com.bytefuture.toolnest.core.ToolModule;
-import com.bytefuture.toolnest.ui.UiKit;
+import com.bytefuture.toolnest.ui.components.UiKit;
+import com.bytefuture.toolnest.ui.spi.ToolModule;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
@@ -106,10 +106,10 @@ public class MyFeatureModule implements ToolModule {
         return "补充说明，比如支持哪些格式、有什么注意事项";
     }
 
-    /** 卡片 / 子项图标，可选，默认圆点 */
+    /** 图标：取 Icons 里注册的名字，可选，留空则回退到分类图标 */
     @Override
-    public String icon() {
-        return "\u2605";
+    public String iconName() {
+        return "sparkle";
     }
 
     /** 搜索关键词，可选，空格分隔 */
@@ -128,16 +128,16 @@ public class MyFeatureModule implements ToolModule {
 }
 ```
 
-**2. 在 `ToolRegistry.bootstrap()` 里注册一行。**
-打开 `src/main/java/com/bytefuture/toolnest/core/ToolRegistry.java`：
+**2. 在 `app.ToolRegistry.bootstrap()` 里注册一行。**
+打开 `src/main/java/com/bytefuture/toolnest/app/ToolRegistry.java`：
 
 ```java
 public static void bootstrap() {
     register(new TimestampModule());
-    register(new JsonFormatModule());
-    register(new EncodeModule());
-    register(new UuidModule());
+    register(new CronModule());
+    // … 其余模块
     register(new MyFeatureModule());   // ← 加这行，并在文件顶部加对应的 import
+    register(new QrModule());
 }
 ```
 

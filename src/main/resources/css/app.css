@@ -750,7 +750,7 @@
    ============================================================ */
 
 .module-body {
-    -fx-padding: 22 24 26 24;
+    -fx-padding: 16 24 16 24;
 }
 
 .module-desc {
@@ -808,9 +808,25 @@
     -fx-alignment: center-left;
 }
 
+/* 数值框右侧的单位后缀（秒 / ms）：等宽字让不同单位的下一位数字对齐 */
+.field-unit {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+    -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
+}
+
 .caption {
     -fx-font-size: 12px;
     -fx-text-fill: -dt-text-subtle;
+}
+
+/* 「此项当前不生效」的原因文字，与 UiKit.degradeNote / setDegraded 配套。
+   设计稿 design/http-batch-redesign.html §06-5 的不变量：「颜色永不是唯一线索」——
+   降级态除了把整组降到 42% 透明度，必须紧跟一句为什么，否则用户只会以为控件坏了。
+   用警示色而不是次级灰：它是「说明」不是「元信息」，压在降级组旁边也要读得清。 */
+.degrade-note {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-warning;
 }
 
 /* ---------- 结果行：建立对齐网格 ----------
@@ -1308,6 +1324,70 @@
     -fx-padding: 0;
 }
 
+/* ---------- 纵向三段式段落 ----------
+   一页竖向预算只够一段输入展开，于是把「请求模板 / CSV / 执行与结果」拆成
+   三段：每段一律占整幅内容宽，纵向靠收起来腾。收起的那段正文看不见，
+   头带摘要必须能读出这一段的当前值，否则收起等于丢信息。 */
+.stage-section {
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 11px;
+    -fx-border-color: -dt-border;
+    -fx-border-radius: 11px;
+    -fx-border-width: 1;
+}
+
+.stage-bar {
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-max-height: 36px;
+    -fx-padding: 0 12;
+    -fx-alignment: center-left;
+}
+
+.stage-bar-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
+.stage-bar-summary {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* 展开态：一条极轻的下边线把头带与正文分开 */
+.stage-section.expanded > .stage-bar {
+    -fx-border-color: -dt-border-faint;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* 收起态：整段就是一条头带，圆角收满，悬停给一点反馈 */
+.stage-section.collapsed > .stage-bar {
+    -fx-background-radius: 11px;
+}
+
+.stage-section.foldable > .stage-bar {
+    -fx-cursor: hand;
+}
+
+.stage-section.foldable.collapsed > .stage-bar:hover {
+    -fx-background-color: -dt-surface-alt;
+}
+
+.stage-body {
+    -fx-padding: 12;
+}
+
+/* 段① 正文竖向比另两段紧一档（12 → 8）：三段共用 .stage-body，而段① 是配置态
+   唯一展开的输入段，省下的 8px 用来把整页拉回一屏内。
+   横向仍是 12 —— 只减竖向，才不会让 ① 的内容比 ②③ 各宽/左移 4px，
+   三段的左边缘与控件宽度保持对齐。
+   没有写 .stage-section:first-child —— JavaFX CSS 不支持结构伪类，
+   所以由 BatchPanel 显式给段① 的正文加这个类名。 */
+.stage-body-compact {
+    -fx-padding: 8 12;
+}
+
 /* 请求地址栏：整页最重的一条横带，紧贴功能标题下方 */
 .http-url {
     -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
@@ -1450,7 +1530,7 @@
 
 .http-main-tabs > .tab-header-area,
 .qr-tabs > .tab-header-area {
-    -fx-padding: 0 0 12 0;
+    -fx-padding: 0 0 10 0;
 }
 
 .http-main-tabs > .tab-header-area > .tab-header-background,
@@ -1618,10 +1698,15 @@
                      "Segoe UI", "PingFang SC", sans-serif;
 }
 
-/* ---------- 响应状态条 ---------- */
-
+/* ---------- 响应状态条 ----------
+   旧版 50px，且「响应体」页签正文里另有一条 42px 的工具条（提示 + 格式化），
+   同一件事的控件分布在上下两层。现在合成一条 36px：
+   左=状态/耗时/大小，右=高亮提示 + 格式化 + 清空响应。
+   36 = 内边距 4×2 + 紧凑按钮 28，与请求页签正文的工具行同处一档。 */
 .http-response-bar {
-    -fx-padding: 8 12;
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-padding: 4 12;
     -fx-background-color: -dt-surface-alt;
     -fx-background-radius: 8px;
     -fx-border-color: -dt-border;
@@ -1629,10 +1714,8 @@
     -fx-border-width: 1;
 }
 
-/* Body 标签页顶部小工具条：左侧提示 + 右侧「格式化」按钮 */
-.http-body-toolbar {
-    -fx-padding: 2 0 8 0;
-}
+/* Body 页签正文里原有的 42px 工具条已撤销 —— 保留空规则会让后来的人
+   以为它还在用，直接删掉。 */
 
 /* ---------- 二维码模块 ---------- */
 
@@ -1643,6 +1726,68 @@
 
 .qr-tabs .tab-content-area {
     -fx-padding: 14 0 0 0;
+}
+
+/* 页签行：TabPane + 右端动作行并排。
+   动作行不是 TabPane 的子节点（Tab 头由 skin 内部生成，塞不进外来节点），
+   只能做它的兄弟，所以这一层 HBox 就是两者的公共父容器。
+   这一层纵向铺满整页高（TabPane 要在里面撑开内容区），
+   而动作行只占顶部那一档 —— 见 .qr-actions 的 max-height。 */
+.qr-tabrow {
+    -fx-padding: 0;
+}
+
+/* 页签行右端的动作组：选择图片 / 粘贴剪贴板 / 清除框选 / 移除图片。
+   TabPane 的 Tab 头区高 48px（含页签下沿留白），动作行取同一档并垂直居中，
+   两个元素才会看起来在同一行上。
+   必须写死 max-height：HBox 会给子节点分配整行高度，
+   不压住它，动作按钮就会落在页面垂直中部。 */
+.qr-actions {
+    -fx-padding: 0 0 0 12;
+    -fx-min-height: 48;
+    -fx-pref-height: 48;
+    -fx-max-height: 48;
+}
+
+/* 动作分组竖线：隔开「怎么取输入」与「丢弃已有输入」两组。
+   1px 宽 + 18px 高，靠 HBox 的间距居中；不要用分隔符控件（它带自己的白边）。 */
+.qr-act-sep {
+    -fx-min-width: 1;
+    -fx-pref-width: 1;
+    -fx-max-width: 1;
+    -fx-min-height: 18;
+    -fx-pref-height: 18;
+    -fx-max-height: 18;
+    -fx-background-color: -dt-border-strong;
+}
+
+/* 结果区标题行：左标题 + 计数徽标，右只读汇总。
+   【这里不含任何可点控件】—— 底部按钮行删掉后，「移除图片」归到页签行，
+   标题行保持纯只读，就不会被 32px 按钮撑高。 */
+.qr-result-head {
+    -fx-padding: 0 0 0 2;
+}
+
+.qr-result-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-text;
+}
+
+/* 计数徽标：识别到几个码。用浅主色底，与「格式标签」同一套语汇。 */
+.qr-result-count {
+    -fx-font-family: "Consolas", "Cascadia Mono", "Menlo", monospace;
+    -fx-font-size: 11px;
+    -fx-text-fill: -dt-accent;
+    -fx-background-color: -dt-accent-soft;
+    -fx-background-radius: 5px;
+    -fx-padding: 1 7;
+}
+
+/* 只读汇总（共 N 个二维码 · 显示 6 个）：弱化到说明级，不与标题抢重 */
+.qr-result-summary {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
 }
 
 /* 识别结果区：滚动容器本身不要底色，让结果卡片浮在内容底之上 */
@@ -2065,4 +2210,169 @@
     -fx-font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI", monospace;
     -fx-font-size: 11.5px;
     -fx-text-fill: -dt-text-subtle;
+}
+
+/* ============================================================
+   ⑩-b 单一请求页重设计（2026-09-30）
+   —— 「切类型要换编辑器形态」+ chrome 从 134 收到 64
+   ============================================================ */
+
+/* ---------- 工具行里的紧凑按钮 ----------
+   按钮高度只有三档：标准 32（.button）/ 工具行 28 / 表内 26。
+   工具行自身预算是 38px（由 38 高的分段控件撑满），塞 32 的按钮会把
+   这一行顶到 40+，整页竖向预算立刻超 —— 所以紧凑档不是「顺手调小」，
+   而是这一行的取值。 */
+.button-compact {
+    -fx-pref-height: 28px;
+    -fx-min-height: 28px;
+    -fx-padding: 0 11;
+    -fx-background-radius: 7px;
+    -fx-border-radius: 7px;
+    -fx-font-size: 12px;
+}
+
+/* 表格单元格内的按钮：比行高（34）矮一档，不撑高行 */
+.button-inline {
+    -fx-pref-height: 26px;
+    -fx-min-height: 26px;
+    -fx-padding: 0 9;
+    -fx-background-radius: 7px;
+    -fx-border-radius: 7px;
+    -fx-font-size: 12px;
+}
+
+/* ---------- 外层业务页签的正文不再额外留白 ----------
+   chrome 的账必须自己算全：详情页头之后、第一块内容之前依次是
+   .module-body 的 padding-top 16 + 页签头区 48（轨道 38 + 下留白 10）。
+   再叠加 .tab-pane 默认的 tab-content-area padding-top 14，就变成 78 ——
+   比设计冻结的 64 多出整整 14px，配置态因此溢出视口。
+   这里把外层这一份收掉（轨道下方仍留 10px，视觉间隔还在），
+   内层数据页签（.http-req-tabs / .http-resp-tabs）不受影响：
+   它们的 312 / 132 是把「页签头 42 + 14 + 正文」一起算进总数的。 */
+.http-main-tabs > .tab-content-area {
+    -fx-padding: 0;
+}
+
+/* ---------- 请求页签正文的工具行 ----------
+   分段控件 38 撑满整行；右侧是常驻 Content-Type / 守卫提示 / 动作槽。 */
+.http-toolbar {
+    -fx-min-height: 38px;
+    -fx-pref-height: 38px;
+}
+
+/* 请求页签：表体 210 = 表头 40 + 5 行 × 34（原 152 → 3.3 行） */
+.http-req-tabs {
+    -fx-min-height: 312px;
+    -fx-pref-height: 312px;
+}
+
+/* 响应页签：配置态保底 132（页签头 56 + 完整空态 76）；
+   查看态由 Java 侧把 maxHeight 放开 + Vgrow 吃满剩余（432 → 24 行）。
+   高度必须写在 CSS 里：Region 的 prefHeight 一旦被 CSS 命中，
+   Java 侧的 setPrefHeight 会被覆盖。 */
+.http-resp-tabs {
+    -fx-min-height: 132px;
+    -fx-pref-height: 132px;
+}
+
+/* 请求体编辑区：五种类型共用同一个 210px 的槽 */
+.http-editor {
+    -fx-min-height: 210px;
+    -fx-pref-height: 210px;
+}
+
+/* 常驻显示的实际 Content-Type：等宽，便于逐字符核对 */
+.http-ctype {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* 守卫提示（冲突 / 按推断类型发送）：
+   颜色之外始终带图标与整句文字 —— 「颜色永不是唯一线索」。 */
+.http-guard {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-warning;
+}
+
+/* ---------- multipart 的文件单元格 ---------- */
+.http-file-name {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text;
+}
+
+.http-file-size {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 11px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* 文件已不在了：明写原因，不只靠颜色 */
+.http-file-missing {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-danger;
+}
+
+/* ---------- 折叠摘要条（查看态 46px）---------- */
+.http-strip {
+    -fx-min-height: 46px;
+    -fx-pref-height: 46px;
+    -fx-max-height: 46px;
+    -fx-padding: 0 12;
+    -fx-background-color: -dt-surface;
+    -fx-background-radius: 9px;
+    -fx-border-color: -dt-border;
+    -fx-border-radius: 9px;
+    -fx-border-width: 1;
+}
+
+/* 摘要条里的方法徽标：等宽 + 浅主色底 */
+.http-method-badge {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -dt-accent;
+    -fx-background-color: -dt-accent-soft;
+    -fx-background-radius: 6px;
+    -fx-padding: 3 8;
+}
+
+.http-strip-url {
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12.5px;
+    -fx-text-fill: -dt-text;
+}
+
+.http-strip-meta {
+    -fx-font-size: 12px;
+    -fx-text-fill: -dt-text-subtle;
+}
+
+/* 请求体类型分段控件：轨道 38 = 项 32 + 内边距 3×2。
+   .segmented-item 的默认档是 30（用于「选项数少、不需要撑满一行」的场合），
+   这里必须抬到 32 —— 它要与整条工具行（38）等高，否则工具行里
+   控件高低不齐，右侧的 Content-Type 与动作槽会跟着上下错半格。 */
+.http-type-seg .segmented-item {
+    -fx-pref-height: 32px;
+    -fx-min-height: 32px;
+    -fx-padding: 0 12;
+}
+
+/* Form-data 文本段的输入框：与键值表的行内编辑器同一档（26px），
+   两种表的行高才都是 34 */
+.http-cell-field {
+    -fx-pref-height: 26px;
+    -fx-min-height: 26px;
+    -fx-font-size: 12.5px;
+}
+
+/* 紧凑空态：给「只装得下一个空态」的窄槽用。
+   响应区在配置态的正文只有 76px（页签 132 − 页签头 56），而 .empty-state
+   的内边距 26 + 间距 9 单是自身就占掉 78 —— 直接放进去会把页签顶高，
+   整页竖向预算当场破。 */
+.empty-state-compact {
+    -fx-padding: 4px;
+    -fx-spacing: 3px;
 }

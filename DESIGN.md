@@ -288,6 +288,10 @@
 
 焦点环默认画在整个 header 上（视觉很吵），改为聚焦时给标签加下划线。
 
+**外层页签的纵向占用必须自己算全**：`.tab-pane > .tab-content-area` 默认带 `-fx-padding: 14 0 0 0`，而外层页签头区本身已经是 48（轨道 38 + 下留白 10）。两者叠加会让「详情页头之后、第一块内容之前」变成 **78px** —— 比按「`.module-body` 上留白 16 + 页签行 48」算出来的 64 多出 14px。做面积预算时漏掉这 14px，配置态就会溢出视口多半条滚动条。外层已显式收掉这一份（`.http-main-tabs > .tab-content-area`），内层数据页签**保留**它 —— 内层的 312 / 132 本来就是按「页签头 42 + 14 + 正文」一起算的总数。
+
+**页签的首选高取各页签的最大值**：同一 `TabPane` 里只要有一个页签的自然高偏大（如批处理页 649），整页就会被顺带撑高，把另一个页签顶出视口。自带内层滚动的页签应当把首选高压平（见 `BatchPanel`），表达「填满父容器给的剩余高度，装不下自己滚」。
+
 ### 结果行
 
 结果行 = **定宽 96px 标签 + 等宽数值**（+ 可选复制按钮），行高 34px，行间只画一条 1px `-dt-border-faint` 分隔线；若干行包在 `.result-table` 里（圆角 9px + 描边）。
@@ -529,6 +533,23 @@
 
 **未执行的检查**：未在 820 / 1024 / 1440px 下逐屏截图验收；未做键盘全流程走查；未测高对比度模式。
 
+### 待实施的设计稿（已评审，尚未落代码）
+
+以下两轮设计均已出**单文件零依赖的 1:1 评审页 + 同级 spec**，但**未改动任何产品代码**。实施前需求方拍板，实施后按 spec 的「可断言验收项」逐条验证。
+
+| 设计 | 评审页 | spec | 范围 | 状态 |
+|---|---|---|---|---|
+| HTTP 批处理页重排版 | `design/http-batch-redesign.html` | `design/http-batch-redesign-spec.md` | 三段式（请求模板 / CSV / 结果）纵向堆叠，结果表 2.7 → 6 行 | 设计定稿 + 实施要点已并入代码（三段式、单行执行条、结果表列宽）；Q1–Q5 按建议执行 |
+| **HTTP 单一请求页重做** | `design/http-single-redesign.html` | `design/http-single-redesign-spec.md` | **类型 → 编辑器**（切 Form 变键值表、新增 Form-data 支持选本地文件）；chrome 134 → 64；响应区 187 → 432px | **已实施**（2026-09-30），Q1=A / Q2=C / Q3=A / Q4=A / Q5=A / Q6=A / Q7 不动外壳 |
+
+**单一请求页带出的口径补充（已并入上文对应小节）**：
+
+1. **Body 类型控件**是一枚**模式开关**，用分段控件（轨道 38 / 项 32）而非下拉框 —— 与「控件高度阶梯」一致，不新增档位。
+2. **请求体编辑器的可见行数换算式**：键值表用 `(表高 − 表头 40) ÷ 34`，文本区用 `文本区内容高 ÷ 该字号真实行高`。
+   键值表在 210px 高时是 5.0 行、文本区实测 12 行（改造前分别是 3.3 行与 6 行）。
+3. **条目类型是模式而非取值时的处置**：右侧动作槽只放「当前类型真的可用」的动作，槽随类型整体换内容，不做「常显 + 点了没反应」。
+4. **降级态不变量**在单一请求页的落法：类型 = 「无」时编辑器槽走 `UiKit.setDegraded`（整组 42%），且槽里显示的是**空态**而不是一个灰掉的输入框。
+
 ### 已执行的验收
 
 在 **1266 × 763**（场景快照实际尺寸）下渲染并人工检查了 12 个界面（`verify.cmd preview`，输出到 `build/ui-preview/`）：
@@ -553,7 +574,7 @@
 - `target/qr-list-probe/multi-code-result.png` —— 一张图里两个二维码时，右侧结果列表给出 `#1` / `#2` 两张卡片（各自带格式标签与复制按钮）。
 - `target/diff-probe/diff-two-columns.png` —— 两栏对比的完整态，含占位行与三类差异着色。同目录另有：`diff-degraded.png`（大文本降级，底部明写「已按行号逐位比对」）、`diff-equal.png`（两侧一致）、`diff-one-side.png`（只填一侧，退回编辑态）、`diff-both-empty.png`（清空后）。
 
-配套的运行态探针（`verify.cmd smoke|cron|cronui|image|qr|qrpic|qrlist|sel|json|body|nav|diff|diffui`）**365 条断言全绿**（其中文本对比：纯逻辑 `diff` 50 + 界面级 `diffui` 39，`smoke` 22、`nav` 19，其余探针沿用原值），CSS 解析错误 **0**。
+配套的运行态探针（`verify.cmd smoke|cron|cronui|image|qr|qrpic|qrlist|sel|json|body|nav|diff|diffui|httpfix|httpsingle|httpsect|httplayout`）**515 条断言全绿**（最新一次全量连跑的实测计数见 `ARCHITECTURE.md` §七），CSS 解析错误 **0**，fat jar 纯净度 **0**。
 
 其中 4 条是本次新增的「尺寸完整性」断言（落在 `nav` 探针）：HTTP 页里每个按钮 / 输入框 / 下拉 / 数字框的实际高度都不得低于首选高度，且整页内容必须按首选高度布局。两条断言都做了**反向验证** —— 撤掉 CSS 的 `min-height` 时前一条变红（精确点名 3 个被压控件），撤掉 `ContentPane` 的最小高度时后一条变红（内容高 1054px → 596px）。
 
@@ -658,5 +679,8 @@
 | `src/main/java/.../ui/Sidebar.java` | 侧边栏（品牌区 / 搜索 / 可滚动分类） |
 | `src/main/java/.../ui/ContentPane.java` | 内容区切换 + 详情页页头 + 页面高度分流 |
 | `src/main/java/.../ui/JsonCodeArea.java` | JSON 语法高亮代码区 |
+| `design/http-batch-redesign.html` · `-spec.md` | HTTP 批处理页重排版评审页 + 实施方案（**单文件零依赖，按 1266×763 的 1:1 绘制**） |
+| `design/http-single-redesign.html` · `-spec.md` | HTTP 单一请求页重做评审页 + 实施方案（5 张 1:1 画布） |
+| `design/text-diff-mockup.html` | 文本对比两栏改版评审页 |
 | `verify/src/main/java/.../DesignPreview.java` | 离屏渲染器，生成视觉评审截图（非产品功能） |
 | `build/ui-preview/*.png` | 视觉评审截图（11 张） |

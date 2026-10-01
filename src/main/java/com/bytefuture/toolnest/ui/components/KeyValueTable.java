@@ -38,7 +38,7 @@ public final class KeyValueTable extends VBox {
 
     private final ObservableList<Row> rows = FXCollections.observableArrayList();
     private final TableView<Row> table = new TableView<>(rows);
-    private final boolean withDescription;
+    private final Label placeholderLabel = new Label("暂无内容");
     private final javafx.beans.property.IntegerProperty rowsCount =
             new javafx.beans.property.SimpleIntegerProperty(0);
 
@@ -47,12 +47,15 @@ public final class KeyValueTable extends VBox {
         rowsCount.addListener((obs, old, now) -> listener.accept(now.intValue()));
     }
 
+    /** 空表提示文字。Params 说「暂无参数」，Headers 说「暂无内容」。 */
+    public void setPlaceholderText(String text) {
+        placeholderLabel.setText(text == null ? "" : text);
+    }
+
     /**
-     * @param withDescription 是否显示 DESCRIPTION 列（Params 面板用，Headers 不用）
-     * @param height          表格高度
+     * @param height 表格高度（可见行数 = {@code (height − 表头 40) ÷ 行高 34}）
      */
-    public KeyValueTable(boolean withDescription, double height) {
-        this.withDescription = withDescription;
+    public KeyValueTable(double height) {
         setSpacing(0);
         getStyleClass().add("kv-table-wrap");
 
@@ -60,7 +63,7 @@ public final class KeyValueTable extends VBox {
         table.setEditable(true);
         table.setPrefHeight(height);
         table.setMinHeight(120);
-        table.setPlaceholder(new Label(withDescription ? "暂无参数" : "暂无内容"));
+        table.setPlaceholder(placeholderLabel);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         TableColumn<Row, String> checkCol = new TableColumn<>("");
@@ -98,7 +101,9 @@ public final class KeyValueTable extends VBox {
         keyCol.setCellValueFactory(c -> c.getValue().key);
         keyCol.setCellFactory(TextFieldTableCell.forTableColumn());
         keyCol.setOnEditCommit(e -> e.getRowValue().key.set(e.getNewValue()));
-        keyCol.setPrefWidth(220);
+        // 340 不是随手取的：面板内宽 936，末列（VALUE）按 FLEX_LAST_COLUMN
+        // 吃掉剩下的 558，于是两列正好落在设计稿的「KEY 340 / VALUE 558」上。
+        keyCol.setPrefWidth(340);
         keyCol.setSortable(false);
 
         TableColumn<Row, String> valueCol = new TableColumn<>("VALUE");
@@ -111,14 +116,6 @@ public final class KeyValueTable extends VBox {
         table.getColumns().add(checkCol);
         table.getColumns().add(keyCol);
         table.getColumns().add(valueCol);
-
-        if (withDescription) {
-            TableColumn<Row, String> descCol = new TableColumn<>("DESCRIPTION");
-            descCol.setCellValueFactory(c -> new SimpleStringProperty(""));
-            descCol.setPrefWidth(180);
-            descCol.setSortable(false);
-            table.getColumns().add(descCol);
-        }
 
         // 始终保留一行空行供录入
         rows.add(new Row("", ""));

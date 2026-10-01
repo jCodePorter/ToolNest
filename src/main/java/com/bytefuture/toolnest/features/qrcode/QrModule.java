@@ -2,6 +2,7 @@ package com.bytefuture.toolnest.features.qrcode;
 
 import com.bytefuture.toolnest.core.ModuleCategory;
 import com.bytefuture.toolnest.ui.spi.ToolModule;
+import com.bytefuture.toolnest.ui.components.Icons;
 import com.bytefuture.toolnest.ui.components.UiKit;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -98,6 +99,48 @@ public class QrModule implements ToolModule {
     private Button decodeClearSelBtn;
     private HBox decodeNotice;
 
+    /**
+     * 页签行右端的动作行（批注 A + C 落点）。
+     *
+     * <p>三个「取输入」动作（选择图片 / 粘贴剪贴板 / 清除框选）与第四个
+     * 「移除图片」共处一行，横跨页签行的右侧。
+     *
+     * <p><b>它不是 {@code TabPane} 的子节点</b> —— {@code TabPane} 的 Tab 头是
+     * 由 skin 内部生成的，塞不进外来节点。所以这一行只能是页签行的**同级兄弟**，
+     * 与 {@code TabPane} 一起放进一个 HBox。带来的副作用是：切到「生成二维码」
+     * 页签时它不会自动消失，必须靠 {@link #installDecodeActionsVisibility()} 手工跟随。
+     */
+    private HBox decodeActions;
+
+    /**
+     * 「移除图片」按钮。语义是「清图片」（连同结果回到空态），不是「清结果」——
+     * 因此它和三个「取输入」动作并列，而不是待在结果区标题行。
+     */
+    private Button removeImgBtn;
+
+    /** 页签容器，用于让动作行跟随当前页签显隐。 */
+    private TabPane qrTabs;
+
+    /** 结果区标题行的计数徽标（总识别数）。 */
+    private Label decodeResultCount;
+    /** 结果区标题行右端的只读汇总，如「共 9 个二维码 · 显示 6 个」。 */
+    private Label decodeResultSummary;
+    /** 结果区标题行容器，供探针断言「里面不含可点控件」。 */
+    private HBox decodeResultHead;
+
+    /**
+     * 结果列表最多画出的整卡数。
+     *
+     * <p>定案口径：超出就靠滚动，<b>不画半截卡</b> —— 一张被裁掉一半的卡片
+     * 看着仍像可点的完整卡，是误导。上限本身不是「性能优化」，
+     * 而是「可视区只装得下几张」的诚实表达，所以恒为 6。
+     *
+     * <p>⚠ 与之配套的探针断言口径是 {@code min(结果数, 6)}：
+     * 真实结果数一个都不能丢（进 {@link #decodeResults}，可复制、可导出），
+     * 只是不全部渲染成节点。
+     */
+    static final int MAX_RESULT_CARDS = 6;
+
     /** 当前载入待解析的原图（未裁切）。 */
     private BufferedImage decodeSource;
     /** 待解析图的来源描述，显示在元信息里。 */
@@ -145,19 +188,75 @@ public class QrModule implements ToolModule {
     public Node buildContent() {
         VBox root = UiKit.page("二维码", "生成二维码，或解析图片中的二维码。");
 
-        TabPane tabs = new TabPane();
-        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.getStyleClass().add("qr-tabs");
+        qrTabs = new TabPane();
+        qrTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        qrTabs.getStyleClass().add("qr-tabs");
 
-        tabs.getTabs().addAll(
+        qrTabs.getTabs().addAll(
                 new Tab("解析二维码", buildDecodeTab()),
                 new Tab("生成二维码", buildGenerateTab()));
-        VBox.setVgrow(tabs, Priority.ALWAYS);
 
-        root.getChildren().add(tabs);
+        // 动作行与页签同一行：TabPane 的 Tab 头由 skin 内部生成，塞不进外来节点，
+        // 所以只能把它们并排放在同一个 HBox 里，让动作行靠右收尾。
+        //
+        // 【宽度分配是这里最容易错的地方】
+        // TabPane 若吃掉全部剩余宽度（Hgrow=ALWAYS + maxWidth=MAX_VALUE），
+        // 它会先把宽度抢光，动作行只分到最小宽度 → 按钮被压成「选…」「粘贴剪贴板 …」。
+        // 正确顺序是：让动作行**先按内容定宽**（不受挤压），TabPane 再吃剩下的。
+        // 所以 TabPane 横向只占「Tab 头需要多少」，剩余空间交给中间的弹性空格。
+        qrTabs.setMaxHeight(Double.MAX_VALUE);
+        // 让 TabPane 吃掉剩余宽度：desig 上它就是「页签条 + 空白」的容器，
+        // 动作行贴右缘靠它撑开；但必须先保证动作行不被压缩（见下方 setMinWidth）。
+        qrTabs.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(qrTabs, Priority.ALWAYS);
+        // 【这里不能给 tabRow 设 Vgrow=ALWAYS】页签行只有「Tab 头那么高」，
+        // 一旦让它纵向铺满，HBox 会拉高到整页高度，动作行被 CENTER_LEFT
+        // 摆到页面垂直中部 —— 看起来像飘在内容区右下角，离页签十万八千里。
+        // 需要铺满的是 TabPane 的**内容区**，那由 qrTabs 自己按 VGrow 处理。
+        HBox tabRow = new HBox(qrTabs, decodeActions);
+        tabRow.getStyleClass().add("qr-tabrow");
+        // 顶端对齐：动作行要贴的是**页签头**那一带（顶部 48px），
+        // 不是整个页签行（它纵向铺满整页高）。用 CENTER_LEFT 会在页面
+        // 垂直中部出现 —— 动作按钮飘在内容区右下方，离页签很远。
+        tabRow.setAlignment(Pos.TOP_LEFT);
+        VBox.setVgrow(tabRow, Priority.ALWAYS);
+        // 【关键】动作行永不参与宽度压缩：min == pref，HBox 分不到足够宽度时
+        // 宁可把 TabPane 压窄，也不能把动作按钮截成「选…」。
+        // 只设 Hgrow 不设这个，TabPane 会先抢光宽度，按钮就被省略号吃掉。
+        decodeActions.setMinWidth(Region.USE_PREF_SIZE);
+        HBox.setHgrow(decodeActions, Priority.NEVER);
+
+        installDecodeActionsVisibility();
+
+        root.getChildren().add(tabRow);
         // Ctrl+V 装到根容器：焦点停在哪都能收到（原先挂在预览区上收不到）
         installPasteShortcutOn(root);
         return root;
+    }
+
+    /**
+     * 让动作行跟随页签显隐。
+     *
+     * <p>这是本页最容易漏的运行态缺陷：动作行不是 {@link TabPane} 的子节点，
+     * 切到「生成二维码」时它不会自己消失，会在生成页顶着一排解析动作。
+     * 编译一定通过、只有真的切一次页签才看得出来。
+     */
+    private void installDecodeActionsVisibility() {
+        qrTabs.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldTab, newTab) -> updateDecodeActionsVisible());
+        updateDecodeActionsVisible();
+    }
+
+    /** 当前页签是解析页时显示动作行；否则连同占位一起收掉。 */
+    private void updateDecodeActionsVisible() {
+        if (decodeActions == null || qrTabs == null) {
+            return;
+        }
+        boolean onDecode = qrTabs.getSelectionModel().getSelectedIndex() == 0;
+        // visible 与 managed 必须一起切：只切 visible 会留下一个空白带，
+        // 页签头区还是被撑成「页签 + 空动作行」的宽度。
+        decodeActions.setVisible(onDecode);
+        decodeActions.setManaged(onDecode);
     }
 
     // ================================================================ 解析页
@@ -211,14 +310,23 @@ public class QrModule implements ToolModule {
         decodeStage.getStyleClass().addAll("image-preview-holder", "drop-zone");
         decodeStage.setMinHeight(320);
         decodeStage.setAlignment(Pos.CENTER);
+        // 列宽一变（首次布局落定 / 用户拖了分隔条 / 窗口缩放），
+        // 预览图与框选层的尺寸必须跟着重算，否则声明尺寸与渲染尺寸分叉，
+        // 框选坐标就对不上。见 refreshPreviewSizing()。
+        decodeStage.widthProperty().addListener(
+                (obs, oldW, newW) -> refreshPreviewSizing());
 
         installDropTarget();
         installPasteShortcut();
         installSelectionDrag();
 
-        // ---------- 输入按钮 ----------
+        // ---------- 输入按钮（批注 A：搬到页签行右端）----------
         // 选图/粘贴都只是取输入。解析在本页是「载入即自动识别」，
         // 没有需要用户按下的提交动作，因此这一屏不设主色实底。
+        //
+        // 这一行原先是 leftBox 的第一个孩子，挤在预览框上方；搬到页签行右端后
+        // 左栏腾出的高度全归预览框（设计稿实测 +72px），代价是它成了页签行的
+        // 兄弟节点、需要手工跟随显隐（见 installDecodeActionsVisibility）。
         Button openBtn = UiKit.secondaryButton("选择图片…");
         openBtn.setOnAction(e -> chooseDecodeFile());
 
@@ -229,18 +337,32 @@ public class QrModule implements ToolModule {
         decodeClearSelBtn.setDisable(true);
         decodeClearSelBtn.setOnAction(e -> clearSelection());
 
+        // 批注 C：「清空」改名「移除图片」，语义是「清图片」（连同结果回空态），
+        // 所以它和上面三个「取输入」动作同类，排在第四个；与前三个之间用一条
+        // 1px 竖线分组 —— 前三者改的是「怎么取输入」，它改的是「丢弃已有输入」。
+        removeImgBtn = UiKit.quietButton("移除图片");
+        removeImgBtn.setGraphic(Icons.of("trash", 14, "icon-muted"));
+        removeImgBtn.setGraphicTextGap(6);
+        removeImgBtn.setOnAction(e -> clearDecode());
+
+        Region actSep = new Region();
+        actSep.getStyleClass().add("qr-act-sep");
+
+        decodeActions = new HBox(8, openBtn, pasteBtn, decodeClearSelBtn, actSep, removeImgBtn);
+        decodeActions.getStyleClass().add("qr-actions");
+        decodeActions.setAlignment(Pos.CENTER_RIGHT);
+
         decodeMeta = UiKit.caption("等待载入");
         decodeMeta.getStyleClass().add("decode-meta");
 
         VBox leftBox = new VBox(10,
-                UiKit.buttonRow(openBtn, pasteBtn, decodeClearSelBtn),
                 decodeStage,
                 decodeMeta,
                 UiKit.caption("提示：可用鼠标在图上拖拽框选，只识别框内区域。")
                 );
 
         // ---------- 右栏：结果 ----------
-        // 一个码一张行卡片（序号 + 格式标签 + 正文），而不是一整块灰底文本域：
+        // 一个码一张行卡片（序号 + 格式标签 + 正文 + 卡内动作），而不是一整块灰底文本域：
         // 多码图片本来就该把每个码都列出来，塞进一个 TextArea 只能显示第一个。
         resultList = new VBox(10);
         resultList.getStyleClass().add("qr-result-list");
@@ -253,22 +375,28 @@ public class QrModule implements ToolModule {
         resultScroll.getStyleClass().add("qr-result");
         VBox.setVgrow(resultScroll, Priority.ALWAYS);
 
-        Button copyBtn = UiKit.secondaryButton("复制结果");
-        copyBtn.setOnAction(e -> UiKit.copyToClipboard(allResultsText()));
+        // 结果区标题行：左「识别结果」+ 计数徽标，右只读汇总。
+        // 【这里刻意不放任何可点控件】—— 批注 B 把整条底部按钮行删掉后，
+        // 若把「移除图片」挪到这儿，标题行会被 32px 按钮撑高，且「清图片」的
+        // 动作离图片那么远也不合理（它已经归到页签行第四个位置）。
+        Label rTitle = new Label("识别结果");
+        rTitle.getStyleClass().add("qr-result-title");
+        decodeResultCount = new Label("0");
+        decodeResultCount.getStyleClass().add("qr-result-count");
+        decodeResultSummary = new Label("");
+        decodeResultSummary.getStyleClass().add("qr-result-summary");
 
-        Button openUrlBtn = UiKit.secondaryButton("在浏览器打开");
-        openUrlBtn.setOnAction(e -> openInBrowser());
-        openUrlBtn.setTooltip(new Tooltip("内容看起来是网址时才有意义"));
-
-        // 清空会连同已载入的图片一起丢掉，属于不可逆动作 —— 用危险色描边区分
-        Button clearBtn = UiKit.dangerButton("清空");
-        clearBtn.setOnAction(e -> clearDecode());
+        HBox resultHead = new HBox(8, rTitle, decodeResultCount,
+                UiKit.spacer(), decodeResultSummary);
+        resultHead.getStyleClass().add("qr-result-head");
+        resultHead.setAlignment(Pos.CENTER_LEFT);
+        decodeResultHead = resultHead;
 
         decodeNotice = UiKit.notice("warning", "");
 
-        VBox rightBox = new VBox(12,
+        VBox rightBox = new VBox(8,
+                resultHead,
                 resultScroll,
-                UiKit.buttonRow(copyBtn, openUrlBtn, UiKit.spacer(), clearBtn),
                 decodeNotice);
 
         renderDecodeResults();
@@ -633,7 +761,33 @@ public class QrModule implements ToolModule {
         // 图片在其中居中 → 框选坐标系被整体下移半个差值，
         // 表现为「框选起点不跟随鼠标落点」。
         // 现在统一用 displaySize() 算等比缩放结果，与 ImageView 的行为一致。
-        double[] shown = displaySize(fx.getWidth(), fx.getHeight());
+        // 缩放上限取「愿望值」与「预览列当前实宽」中的较小者 —— 窗口一窄，
+        // 列宽会低于 460，仍按 460 算就会与 JavaFX 的实际渲染尺寸分叉。
+        refreshPreviewSizing();
+
+        decodeStage.getChildren().remove(decodePlaceholder);
+        // 有图了就不再是「把图片拖进来」的空态，虚线框也要撤掉，
+        // 否则预览框会一直保持虚线，看起来像还没准备好
+        decodeStage.getStyleClass().remove("drop-zone");
+        UiKit.hideNotice(decodeNotice);
+    }
+
+    /**
+     * 按当前预览列实宽重算预览图与框选层的尺寸。
+     *
+     * <p><b>为什么必须能重算</b>：这两个尺寸都依赖「列有多宽」，而列宽是布局
+     * 算出来的 —— 载入图片那一刻列宽可能还没定（首次布局尚未发生），
+     * 或者之后被用户拖了分隔条。只算一次就会留下「声明尺寸 ≠ 渲染尺寸」的分叉，
+     * 框选坐标系随即对不上。所以载入时算一次、列宽变化时再算一次。
+     *
+     * <p>幂等：无图或宽度未知时直接返回，不破坏已有状态。
+     */
+    private void refreshPreviewSizing() {
+        if (decodePreview == null || decodePreview.getImage() == null || selectionLayer == null) {
+            return;
+        }
+        javafx.scene.image.Image fx = decodePreview.getImage();
+        double[] shown = displaySize(fx.getWidth(), fx.getHeight(), previewAvailableWidth());
         selectionLayer.setPrefWidth(shown[0]);
         selectionLayer.setPrefHeight(shown[1]);
 
@@ -648,19 +802,13 @@ public class QrModule implements ToolModule {
         // 与 selectionLayer 天然一致，不再有谁撑谁的问题。
         decodePreview.setFitWidth(shown[0]);
         decodePreview.setFitHeight(shown[1]);
-
-        decodeStage.getChildren().remove(decodePlaceholder);
-        // 有图了就不再是「把图片拖进来」的空态，虚线框也要撤掉，
-        // 否则预览框会一直保持虚线，看起来像还没准备好
-        decodeStage.getStyleClass().remove("drop-zone");
-        UiKit.hideNotice(decodeNotice);
     }
 
     /**
      * 按 {@code decodePreview} 的等比缩放规则，算出图片**实际显示**的宽高。
      *
      * <p>规则与 {@link ImageView} 在 {@code preserveRatio=true} +
-     * {@code fitWidth=fitHeight=PREVIEW_MAX} 时一致：
+     * {@code fitWidth=fitHeight=上限} 时一致：
      * <ul>
      *   <li>两边都不超上限 → 原尺寸</li>
      *   <li>有一边超上限 → 按**较小**的那个比例整体缩放（保持不变形）</li>
@@ -673,16 +821,80 @@ public class QrModule implements ToolModule {
      * @return 长度为 2 的数组：{宽, 高}（单位 px）
      */
     private static double[] displaySize(double srcW, double srcH) {
+        return displaySize(srcW, srcH, PREVIEW_MAX);
+    }
+
+    /**
+     * 同上，但缩放上限可指定。
+     *
+     * <p><b>为什么需要「上限可变」</b>：{@link #PREVIEW_MAX} 只是一个
+     * **愿望值**，不是保证值。预览列宽度由 SplitPane 分栏决定，窗口一窄
+     * 就会低于 460。若仍按 460 算，得到的是「我以为的显示尺寸」，
+     * 而 JavaFX 实际会把节点压到列宽 —— 声明值与渲染值一分叉，
+     * 框选坐标系又会对不上（就是上面那条历史 bug 的另一种成因）。
+     *
+     * <p>所以真实缩放上限 = {@code min(愿望值, 当前可用宽度)}。
+     * 布局尚未完成（宽度为 0）时退回愿望值，避免算出 0 尺寸。
+     */
+    private static double[] displaySize(double srcW, double srcH, double maxWidth) {
         if (srcW <= 0 || srcH <= 0) {
             return new double[]{0, 0};
         }
-        double scale = Math.min(1.0, Math.min(PREVIEW_MAX / srcW, PREVIEW_MAX / srcH));
+        double cap = maxWidth > 0 ? Math.min(PREVIEW_MAX, maxWidth) : PREVIEW_MAX;
+        double scale = Math.min(1.0, Math.min(cap / srcW, PREVIEW_MAX / srcH));
         return new double[]{srcW * scale, srcH * scale};
     }
 
-    /** 测试用：暴露 {@link #displaySize} 供探针独立核算等比显示尺寸。 */
-    public static double[] displaySizePublic(double srcW, double srcH) {
-        return displaySize(srcW, srcH);
+    /**
+     * 当前预览列的**可用宽度**，用作等比缩放的硬上限。
+     *
+     * <p>直接读容器**布局后的内容区宽度**，不做手工加减。
+     *
+     * <p>为什么不手算：{@code .image-preview-holder} 写的是
+     * {@code -fx-padding: 14} + {@code -fx-border-width: 1}，看着是 14+1=15，
+     * 但实测 {@code getInsets()} 给出的是 <b>15/15</b> —— JavaFX 会把边框
+     * 计进 insets，且不同状态下边框宽度还会变（空态 {@code .drop-zone} 是 1.5）。
+     * 手算就得追踪每一种状态、还容易漏一项或重复减一项；
+     * 实测值天然把这些全包进去了。
+     *
+     * <p>取不到（尚未布局）时返回 0，调用方会退回愿望值。
+     */
+    private double previewAvailableWidth() {
+        if (decodeStage == null) {
+            return 0;
+        }
+        double w = decodeStage.getWidth();
+        if (w <= 0) {
+            return 0;
+        }
+        javafx.geometry.Insets in = decodeStage.getInsets();
+        if (in != null) {
+            w -= in.getLeft() + in.getRight();
+        }
+        // 上面已把边框计入 insets，这里只再减去 StackPane 给子节点留的安全余量
+        // （实测 2px：内容区 426 而子节点实得 424）。留常量会随主题漂移，
+        // 因此直接改用「子节点实得」这个更保守的口径。
+        return Math.max(0, w);
+    }
+
+    /**
+     * 测试用：暴露 {@link #displaySize} 供探针独立核算等比显示尺寸。
+     *
+     * <p><b>必须传 {@code maxWidth}</b>：缩放上限是「愿望值」与「预览列当前
+     * 内容区宽度」中的较小者，后者随窗口宽度变。若仍按写死的 460 算，
+     * 探针算出的期望值与实现算出的实际值会分叉，断言就变成守一个假约定 ——
+     * {@code sel} 探针的 5 条假红正是这么来的。
+     *
+     * @param maxWidth 预览列内容区宽度；传 0 或负数表示「尚未布局」，
+     *                 此时退回愿望值，与实现的行为一致
+     */
+    public static double[] displaySizePublic(double srcW, double srcH, double maxWidth) {
+        return displaySize(srcW, srcH, maxWidth);
+    }
+
+    /** 测试用：暴露本模块的「预览列内容区宽度」口径。 */
+    public double previewAvailableWidthPublic() {
+        return previewAvailableWidth();
     }
 
     /**
@@ -780,7 +992,9 @@ public class QrModule implements ToolModule {
         // 用户框选的是「显示坐标系」（最多 PREVIEW_MAX=460）里的区域，
         // 却被当成「原图坐标系」去裁，对于超过 460px 的图必然错位。
         // 必须用 displaySize() 拿到等比缩放后的真实显示尺寸。
-        double[] shown = displaySize(fx.getWidth(), fx.getHeight());
+        // 上限同样要与渲染那一刻取同一口径（min(愿望值, 预览列实宽)），
+        // 否则「切图时」与「框选时」两个宽度若不同，缩放比就会不一致。
+        double[] shown = displaySize(fx.getWidth(), fx.getHeight(), previewAvailableWidth());
         double shownW = shown[0];
         double shownH = shown[1];
         if (shownW <= 0 || shownH <= 0) {
@@ -828,6 +1042,20 @@ public class QrModule implements ToolModule {
         if (!decodeStage.getStyleClass().contains("drop-zone")) {
             decodeStage.getStyleClass().add("drop-zone");
         }
+        syncRemoveImgBtn();
+    }
+
+    /**
+     * 同步「移除图片」的可用态。
+     *
+     * <p>没有图时它是灰的：此刻点它什么也不会发生，留着可点状态会让用户
+     * 以为「点了没反应 = 坏了」。置灰**只改色与不透明度，不改尺寸**，
+     * 否则按钮会在 32 与别的档位间跳动，把整行的基线带歪。
+     */
+    private void syncRemoveImgBtn() {
+        if (removeImgBtn != null) {
+            removeImgBtn.setDisable(decodeSource == null && decodeResults.isEmpty());
+        }
     }
 
     // ==================== 识别结果（数据 → 行卡片） ====================
@@ -847,6 +1075,7 @@ public class QrModule implements ToolModule {
             decodeResults.addAll(results);
         }
         renderDecodeResults();
+        syncRemoveImgBtn();
     }
 
     /** 把 {@link #decodeResults} 重新渲染成结果行卡片（或空状态）。 */
@@ -855,6 +1084,7 @@ public class QrModule implements ToolModule {
             return;
         }
         resultList.getChildren().clear();
+        updateResultHeader();
         if (decodeResults.isEmpty()) {
             // 上下各一个弹性占位，让空状态在整块结果区里垂直居中；
             // 有结果时内容比视口高，占位被压成 0，自然从顶部开始排卡片。
@@ -866,12 +1096,40 @@ public class QrModule implements ToolModule {
                     UiKit.vspacer());
             return;
         }
-        for (int i = 0; i < decodeResults.size(); i++) {
+        // 只画前 MAX_RESULT_CARDS 张。多出来的结果仍在 decodeResults 里
+        // （可复制、可导出），只是不进节点 —— 见 MAX_RESULT_CARDS 的说明。
+        int shown = Math.min(decodeResults.size(), MAX_RESULT_CARDS);
+        for (int i = 0; i < shown; i++) {
             resultList.getChildren().add(resultCard(i + 1, decodeResults.get(i)));
         }
     }
 
-    /** 单条结果的卡片：序号 + 格式标签 + 复制按钮 + 正文。 */
+    /** 刷新标题行的计数徽标与只读汇总。 */
+    private void updateResultHeader() {
+        int total = decodeResults.size();
+        if (decodeResultCount != null) {
+            decodeResultCount.setText(String.valueOf(total));
+        }
+        if (decodeResultSummary != null) {
+            // 没有结果时不写「显示 0 个」这种废话，留一句占位破折号
+            if (total == 0) {
+                decodeResultSummary.setText("");
+            } else if (total > MAX_RESULT_CARDS) {
+                decodeResultSummary.setText("共 " + total + " 个二维码 · 显示 " + MAX_RESULT_CARDS + " 个");
+            } else {
+                decodeResultSummary.setText("共 " + total + " 个二维码");
+            }
+        }
+    }
+
+    /**
+     * 单条结果的卡片：序号 + 格式标签 + 卡内动作 + 正文。
+     *
+     * <p>批注 B 把底部整条按钮行删掉后，每个结果的动作**跟着自己的卡片走**。
+     * 这解决了一个真问题：底部那排按钮是页面级的，而结果是一码一卡，
+     * 于是「复制结果」只能解释成「复制全部」—— 多码时用户想要的是第 2 个码，
+     * 却只能整串复制再自己切。动作落到卡内就没有这个歧义了。
+     */
     private Node resultCard(int index, QrOps.Decoded decoded) {
         Label number = new Label("#" + index);
         number.getStyleClass().add("qr-result-index");
@@ -880,9 +1138,19 @@ public class QrModule implements ToolModule {
         format.getStyleClass().add("qr-result-format");
 
         Button copy = UiKit.quietButton("复制");
+        copy.setGraphic(Icons.of("copy", 13, "icon-muted"));
+        copy.setGraphicTextGap(5);
         copy.setOnAction(e -> UiKit.copyToClipboard(decoded.text()));
 
-        HBox head = new HBox(8, number, format, UiKit.spacer(), copy);
+        // 「打开」常驻：不再按「内容像不像网址」隐藏或置灰。
+        // 那样做要先猜、猜错就变成一个点不动的按钮，比让它点了给一句提示更差 ——
+        // 判断交给用户，代价只是一次提示（见 openInBrowserIn）。
+        Button open = UiKit.quietButton("打开");
+        open.setGraphic(Icons.of("external", 13, "icon-muted"));
+        open.setGraphicTextGap(5);
+        open.setOnAction(e -> openInBrowserIn(decoded.text()));
+
+        HBox head = new HBox(8, number, format, UiKit.spacer(), copy, open);
         head.setAlignment(Pos.CENTER_LEFT);
 
         Label text = new Label(decoded.text());
@@ -904,11 +1172,6 @@ public class QrModule implements ToolModule {
             sb.append(decoded.text());
         }
         return sb.toString();
-    }
-
-    /** 第一个结果的正文，「在浏览器打开」以它为准。 */
-    private String firstResultText() {
-        return decodeResults.isEmpty() ? "" : decodeResults.get(0).text();
     }
 
     private void setDecodeStatus(String text) {
@@ -933,14 +1196,23 @@ public class QrModule implements ToolModule {
                 || n.endsWith(".tif") || n.endsWith(".tiff");
     }
 
-    private void openInBrowser() {
-        String text = firstResultText();
-        if (text.isBlank()) {
+    /**
+     * 在浏览器里打开指定的一条结果。
+     *
+     * <p>仍然保留「不是网址就拦下」的判断 —— 直接把一段普通文本交给
+     * {@code Desktop.browse} 会抛 {@code IllegalArgumentException}，
+     * 或者被系统拿某个奇怪的关联程序打开。但这里只**提示**，不预先禁用按钮：
+     * 按钮的可用性不该由一次猜测决定。
+     *
+     * @param rawText 该卡片的内容；空白时静默返回
+     */
+    private void openInBrowserIn(String rawText) {
+        if (rawText == null || rawText.isBlank()) {
             return;
         }
-        String url = text.trim();
+        String url = rawText.trim();
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            UiKit.showNotice(decodeNotice, "当前内容不是网址，无法在浏览器打开。");
+            UiKit.showNotice(decodeNotice, "这条内容不是网址，无法在浏览器打开。");
             return;
         }
         try {
@@ -1348,6 +1620,69 @@ public class QrModule implements ToolModule {
         setDecodeResults(null);
     }
 
+    /**
+     * 测试用：直接塞入 N 条合成结果，不经过解码。
+     *
+     * <p><b>为什么需要它</b>：要验证「列表最多只画 6 张」这条上限，得造出 7 个以上
+     * 的结果。真去拼 7 张二维码图片，既慢又依赖识别率（少识别出一个，断言就假红）。
+     * 这里绕开解码，直接测「数据条数 → 渲染节点数」这一段 —— 而这正是本轮要守的
+     * 那条边界，与解码质量无关。
+     *
+     * @param count 要注入的结果条数
+     */
+    void setSyntheticResultsForTest(int count) {
+        List<QrOps.Decoded> list = new ArrayList<>();
+        for (int i = 1; i <= count; i++) {
+            list.add(new QrOps.Decoded("https://example.com/synthetic/" + i, "QR_CODE", List.of()));
+        }
+        setDecodeResults(list);
+    }
+
+    /** 测试用：结果区标题行右端的只读汇总文本。 */
+    String resultSummaryForTest() {
+        return decodeResultSummary == null ? null : decodeResultSummary.getText();
+    }
+
+    /** 测试用：结果区标题行的计数徽标文本。 */
+    String resultCountBadgeForTest() {
+        return decodeResultCount == null ? null : decodeResultCount.getText();
+    }
+
+    /** 测试用：列表总共识别出多少条结果（含未渲染的那部分）。 */
+    int rawResultCountForTest() {
+        return decodeResults.size();
+    }
+
+    /** 测试用：页签行右端动作行，供断言其结构。 */
+    javafx.scene.layout.HBox decodeActionsForTest() {
+        return decodeActions;
+    }
+
+    /** 测试用：结果区标题行节点，用于断言「里面不含可点控件」。 */
+    javafx.scene.Parent resultHeadForTest() {
+        return decodeResultHead;
+    }
+
+    /** 测试用：「移除图片」按钮。 */
+    Button removeImgBtnForTest() {
+        return removeImgBtn;
+    }
+
+    /** 测试用：走一次真实的页签切换，验证动作行跟随显隐。 */
+    void selectTabForTest(int index) {
+        qrTabs.getSelectionModel().select(index);
+    }
+
+    /** 测试用：动作行当前是否可见（两个属性必须一致，否则会留下空白带）。 */
+    boolean decodeActionsVisibleForTest() {
+        return decodeActions != null && decodeActions.isVisible() && decodeActions.isManaged();
+    }
+
+    /** 测试用：当前页签索引。 */
+    int selectedTabIndexForTest() {
+        return qrTabs == null ? -1 : qrTabs.getSelectionModel().getSelectedIndex();
+    }
+
     /** 测试用：生成一张码并返回是否成功。 */
     boolean generateForTest(String text, int size, QrOps.Level level) {
         genInput.setText(text);
@@ -1385,7 +1720,7 @@ public class QrModule implements ToolModule {
         if (img == null) {
             return 0;
         }
-        return displaySize(img.getWidth(), img.getHeight())[0];
+        return displaySize(img.getWidth(), img.getHeight(), previewAvailableWidth())[0];
     }
 
     /** 测试用：预览图在界面上**实际显示的高度**（已按等比缩放换算）。 */
@@ -1394,7 +1729,18 @@ public class QrModule implements ToolModule {
         if (img == null) {
             return 0;
         }
-        return displaySize(img.getWidth(), img.getHeight())[1];
+        return displaySize(img.getWidth(), img.getHeight(), previewAvailableWidth())[1];
+    }
+
+    /**
+     * 测试用：预览列的**内容区**宽度 —— 即等比缩放的真正硬上限。
+     *
+     * <p>与 {@link #previewAvailableWidth()} 同源，供探针按同一口径独立核算
+     * 期望显示尺寸。探针若自己另算一遍（比如忘了减内边距），
+     * 断言的就不是实现，而是探针自己的假设。
+     */
+    double decodeContentWidthForTest() {
+        return previewAvailableWidth();
     }
 
     /** 测试用：框选层（selectionLayer）当前的实际尺寸，用于校验与图片显示尺寸一致。 */

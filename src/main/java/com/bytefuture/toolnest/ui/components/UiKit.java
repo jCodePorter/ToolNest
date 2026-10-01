@@ -3,17 +3,23 @@ package com.bytefuture.toolnest.ui.components;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Spinner;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.KeyEvent;
 import javafx.css.PseudoClass;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+
+import java.util.function.Consumer;
 
 /**
  * 功能模块公用的界面构件工厂。
@@ -215,6 +221,106 @@ public final class UiKit {
         label.getStyleClass().add("caption");
         label.setWrapText(true);
         return label;
+    }
+
+    // ==================== 降级态：此项当前不生效 ====================
+
+    /**
+     * 降级态的整组透明度。
+     *
+     * <p>{@code 0.42} 不是随手取的：设计稿 {@code design/http-batch-redesign.html}
+     * §06-5 把「整行降透明（42%）+ 明写原因」写成了不变量。
+     */
+    public static final double DEGRADE_OPACITY = 0.42;
+
+    /** 键盘兜底拦截器只挂一次，用客户端属性做标记。 */
+    private static final String DEGRADE_HOOK = "toolnest.degradeKeyGuard";
+
+    /**
+     * 降级原因文字（警示色小字），初始隐藏。
+     *
+     * <p>设计稿 §06-5 的原话是「<b>颜色永不是唯一线索</b>」——
+     * 只把控件压暗，用户只会以为界面坏了，必须补一句「为什么」。
+     * 用它配合 {@link #setDegraded} 使用。
+     */
+    public static Label degradeNote(String text) {
+        Label label = new Label(text);
+        label.getStyleClass().add("degrade-note");
+        label.setVisible(false);
+        label.setManaged(false);
+        return label;
+    }
+
+    /**
+     * 把一组控件切成 / 切回「当前不生效」的降级态。
+     *
+     * <p>设计稿 {@code design/http-batch-redesign.html} §06-5 的不变量是
+     * 「整行降透明（{@value #DEGRADE_OPACITY}）+ <b>明写原因</b>」，并明确写了
+     * 「<b>不能只做 {@code setDisable}</b>」。所以这里刻意<b>不调</b>
+     * {@code setDisable}：
+     * <ul>
+     *   <li>它的降透明只作用于被禁的<b>那一个子节点</b> —— 早先线程数只禁了数值框，
+     *       于是标签仍是全黑、数值却淡到几乎看不见（实测标签 {@code (90,96,104)}
+     *       对数值 {@code (209,211,215)}），看着就像控件坏了；</li>
+     *   <li>它还会额外灰掉输入框的表面与描边，而设计稿要的是「保留表面、整体降透明」。</li>
+     * </ul>
+     * 交互拦截改用「不吃鼠标 + 不进 Tab 序 + 编辑器只读」，键盘再挂一道拦截器兜底
+     * （面板初始化时就处于降级态时，控件可能已经拿到焦点）。
+     *
+     * @param target   要降级的控件，通常是包住标签与输入框的那个容器
+     * @param note     {@link #degradeNote} 产出的原因文字，可传 null
+     * @param degraded true = 进入降级态
+     */
+    public static void setDegraded(Node target, Label note, boolean degraded) {
+        target.setOpacity(degraded ? DEGRADE_OPACITY : 1);
+        target.setMouseTransparent(degraded);
+        target.setFocusTraversable(!degraded);
+        forEachDescendant(target, node -> {
+            if (node instanceof TextInputControl input) {
+                setEditableIfUnbound(input, !degraded);
+            } else if (node instanceof Spinner<?> spinner) {
+                spinner.setEditable(!degraded);
+                spinner.setMouseTransparent(degraded);
+                spinner.setFocusTraversable(!degraded);
+                if (spinner.getProperties().putIfAbsent(DEGRADE_HOOK, Boolean.TRUE) == null) {
+                    spinner.addEventFilter(KeyEvent.ANY, e -> {
+                        if (spinner.isMouseTransparent()) {
+                            e.consume();
+                        }
+                    });
+                }
+            }
+        });
+        if (note != null) {
+            note.setVisible(degraded);
+            note.setManaged(degraded);
+        }
+    }
+
+    /**
+     * 只给<b>没被绑定</b>的编辑器设 {@code editable}。
+     *
+     * <p>{@code Spinner} 的编辑器（{@code FakeFocusTextField}）的 {@code editable}
+     * 被 SpinnerSkin 绑到了 Spinner 自己的 {@code editable} 上 —— 直接设会抛
+     * {@code RuntimeException: A bound value cannot be set.}，而这个异常会把
+     * {@link #setDegraded} 从中间掐断，后面的「原因文字收起」就再也不会执行，
+     * 界面上留下一个「已经恢复可用、却还挂着『此项不生效』说明」的错位状态。
+     * Spinner 那一支已经设过它自己的属性，这里跳过绑定的编辑器即可。
+     */
+    private static void setEditableIfUnbound(TextInputControl input, boolean editable) {
+        if (!input.editableProperty().isBound()) {
+            input.setEditable(editable);
+        }
+    }
+
+    /** 前序遍历节点子树 —— 降级要连带里面的输入控件一起拦住。 */
+    private static void forEachDescendant(Node node, Consumer<Node> visitor) {
+        visitor.accept(node);
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                forEachDescendant(child, visitor);
+            }
+        }
     }
 
     /**

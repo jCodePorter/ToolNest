@@ -6,6 +6,7 @@ import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
@@ -15,6 +16,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -112,8 +114,13 @@ public class MultiQrProbe extends Application {
 
         check("返回的是第一个码的正文",
                 textA.equals(first), String.valueOf(first));
-        check("界面卡片数 == 解码条数（第 2 个码没有被丢弃）",
-                module.resultCardCountForTest() == decoded.size(),
+        // 【口径已于 2026-10-01 变更】原断言是「卡片数 == 解码条数」。
+        // 设计定案后列表只画 6 张整卡（超出靠滚动，不画半截卡），
+        // 所以正确的是 min(结果数, 6)——2 个码时仍应为 2。
+        // 不能放宽成「卡片数 <= 结果数」：那等于把断言放空，
+        // 「第 2 个码有没有被丢弃」这件事就再也守不住了。
+        check("界面卡片数 == min(解码条数, 6)（第 2 个码没有被丢弃）",
+                module.resultCardCountForTest() == Math.min(decoded.size(), 6),
                 "卡片 " + module.resultCardCountForTest() + " / 解码 " + decoded.size());
 
         String joined = module.decodeResultTextForTest();
@@ -136,6 +143,138 @@ public class MultiQrProbe extends Application {
             root.layout();
         } catch (Exception ex) {
             check("单码回落验证", false, ex.toString());
+        }
+
+        // ==================== 列表上限口径（2026-10-01 定案）====================
+        // 只画 6 张整卡：超出的结果仍在数据里（可复制、可导出），只是不进节点。
+        // 不画半截卡 —— 一张被裁掉一半的卡片看着仍像可点的完整卡。
+        try {
+            module.setSyntheticResultsForTest(9);
+            root.applyCss();
+            root.layout();
+            check("数据侧仍是 9 条（没有在数据层截断）",
+                    module.rawResultCountForTest() == 9,
+                    "实际 " + module.rawResultCountForTest());
+            check("列表只画 6 张整卡（上限真的在起作用，不是恒等于结果数）",
+                    module.resultCardCountForTest() == 6,
+                    "实际 " + module.resultCardCountForTest());
+            check("计数徽标显示总数 9（不是显示 6）",
+                    "9".equals(module.resultCountBadgeForTest()),
+                    String.valueOf(module.resultCountBadgeForTest()));
+            check("标题行汇总写明「共 9 个二维码 · 显示 6 个」",
+                    "共 9 个二维码 · 显示 6 个".equals(module.resultSummaryForTest()),
+                    String.valueOf(module.resultSummaryForTest()));
+
+            // 反向验证：刚好 6 条时不应出现「显示 6 个」这种冗余说明
+            module.setSyntheticResultsForTest(6);
+            root.applyCss();
+            root.layout();
+            check("恰好 6 条时卡片数 == 6 且汇总不写「显示」（不是恒写上限）",
+                    module.resultCardCountForTest() == 6
+                            && "共 6 个二维码".equals(module.resultSummaryForTest()),
+                    module.resultCardCountForTest() + " / " + module.resultSummaryForTest());
+
+            module.clearDecodeResultForTest();
+            root.applyCss();
+            root.layout();
+            check("清空后卡片数 == 0 且汇总为空（上限断言不是恒真）",
+                    module.resultCardCountForTest() == 0
+                            && "".equals(module.resultSummaryForTest()),
+                    module.resultCardCountForTest() + " / " + module.resultSummaryForTest());
+        } catch (Exception ex) {
+            check("列表上限口径验证", false, ex.toString());
+        }
+
+        // ==================== 批注 A / B / C 的结构落点 ====================
+        // 这三条守的是「布局改造后各部件还在它该在的位置」。
+        // 全部落在**真实节点树**上，不读模块的布尔字段。
+        try {
+            module.clearDecodeResultForTest();
+            module.decodeImageForTest(sample);
+            root.applyCss();
+            root.layout();
+
+            // 批注 A：三个取输入动作 + 移除图片，共处页签行右端的动作行
+            javafx.scene.layout.HBox actions = module.decodeActionsForTest();
+            check("页签行右端存在动作行", actions != null, "null");
+            if (actions != null) {
+                List<String> labels = new ArrayList<>();
+                int buttonCount = 0;
+                for (Node n : actions.getChildren()) {
+                    if (n instanceof javafx.scene.control.Button b) {
+                        labels.add(b.getText());
+                        buttonCount++;
+                    }
+                }
+                check("动作行含 4 个按钮（选择图片 / 粘贴剪贴板 / 清除框选 / 移除图片）",
+                        buttonCount == 4, labels.toString());
+                check("动作行第 1 个是「选择图片…」（取输入组在前）",
+                        labels.size() >= 1 && labels.get(0).startsWith("选择图片"), labels.toString());
+                check("动作行最末一个是「移除图片」（丢弃组在后）",
+                        labels.size() >= 4 && "移除图片".equals(labels.get(3)), labels.toString());
+                // 第 4 个按钮必须带图标（批注 C：图标 + 文字，不是纯文字）
+                Button rm = module.removeImgBtnForTest();
+                check("「移除图片」带图标（不是纯文字按钮）",
+                        rm != null && rm.getGraphic() != null, "graphic=null");
+                check("「移除图片」不是危险色描边按钮（已降为静默动作）",
+                        rm != null && !rm.getStyleClass().contains("danger-button"),
+                        rm == null ? "null" : rm.getStyleClass().toString());
+                // 分组竖线：1px 宽、18px 高，夹在第 3 与第 4 个按钮之间
+                boolean hasSep = actions.getChildren().stream()
+                        .anyMatch(n -> n.getStyleClass().contains("qr-act-sep"));
+                check("动作行内有一条分隔线隔开两组", hasSep, "未找到 .qr-act-sep");
+            }
+
+            // 批注 B：底部按钮行已删除，且动作已落到每张卡片内
+            javafx.scene.Parent rightPane = module.resultHeadForTest();
+            check("结果区标题行存在", rightPane != null, "null");
+            if (rightPane != null) {
+                long headButtons = rightPane.lookupAll(".button").stream()
+                        .filter(n -> n instanceof javafx.scene.control.Button).count();
+                check("结果区标题行内不含任何按钮（清空与复制都已移走）",
+                        headButtons == 0, "找到 " + headButtons + " 个");
+            }
+            // 卡内两个动作：复制 / 打开
+            javafx.scene.Scene sc = scene;
+            long cardCopy = sc.getRoot().lookupAll(".qr-result-card .button").stream()
+                    .filter(n -> n instanceof javafx.scene.control.Button b
+                            && "复制".equals(b.getText())).count();
+            check("每张结果卡内部都有「复制」动作（卡片数 2 → 应有 2 个）",
+                    cardCopy == 2, "找到 " + cardCopy + " 个");
+            long cardOpen = sc.getRoot().lookupAll(".qr-result-card .button").stream()
+                    .filter(n -> n instanceof javafx.scene.control.Button b
+                            && "打开".equals(b.getText())).count();
+            check("每张结果卡内部都有「打开」动作（不因内容非网址而隐藏）",
+                    cardOpen == 2, "找到 " + cardOpen + " 个");
+            boolean anyDisabledOpen = sc.getRoot().lookupAll(".qr-result-card .button").stream()
+                    .filter(n -> n instanceof javafx.scene.control.Button b
+                            && "打开".equals(b.getText()))
+                    .anyMatch(n -> ((javafx.scene.control.Button) n).isDisable());
+            check("没有任何一张卡的「打开」处于禁用态（Q6 定案）",
+                    !anyDisabledOpen, "存在禁用的「打开」");
+            // 旧的底部按钮行已不存在于右栏末位
+            boolean bottomRowGone = sc.getRoot().lookupAll(".button").stream()
+                    .filter(n -> n instanceof javafx.scene.control.Button b)
+                    .noneMatch(n -> "复制结果".equals(((javafx.scene.control.Button) n).getText())
+                            || "在浏览器打开".equals(((javafx.scene.control.Button) n).getText())
+                            || "清空".equals(((javafx.scene.control.Button) n).getText()));
+            check("「复制结果 / 在浏览器打开 / 清空」三个旧按钮已全部移除",
+                    bottomRowGone, "仍能找到旧按钮");
+
+            // 批注 A 的运行态陷阱：切到生成页签后动作行必须跟着消失
+            module.selectTabForTest(1);
+            root.applyCss();
+            root.layout();
+            check("切到「生成二维码」后动作行隐藏（visible 与 managed 同时为 false）",
+                    !module.decodeActionsVisibleForTest(),
+                    "visible=" + module.decodeActionsVisibleForTest());
+            module.selectTabForTest(0);
+            root.applyCss();
+            root.layout();
+            check("切回「解析二维码」后动作行恢复显示",
+                    module.decodeActionsVisibleForTest(), "仍为 false");
+        } catch (Exception ex) {
+            check("批注 A/B/C 结构验证", false, ex.toString());
         }
 
         Platform.runLater(() -> Platform.runLater(() -> Platform.runLater(() -> {

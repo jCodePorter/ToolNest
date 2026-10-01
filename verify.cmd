@@ -21,6 +21,10 @@ REM    verify.cmd sel            shortcut: run SelectionE2EProbe (crop/selection
 REM    verify.cmd smoke          shortcut: run SmokeTest (screenshots)
 REM    verify.cmd json           shortcut: run JsonProbe
 REM    verify.cmd body           shortcut: run HttpBodyProbe
+REM    verify.cmd httpfix        shortcut: run HttpFixProbe (http bug fixes)
+REM    verify.cmd httplayout     shortcut: run HttpBatchLayoutProbe (HTTP 三段式布局)
+REM    verify.cmd httpsect      shortcut: run HttpSectionsProbe (真实页面 + 真实鼠标点击)
+REM    verify.cmd httpsingle    shortcut: run HttpSingleUiProbe (单一请求页重设计)
 REM    verify.cmd nav            shortcut: run ContentPaneProbe
 REM    verify.cmd diff           shortcut: run DiffTest (no UI)
 REM    verify.cmd diffui         shortcut: run DiffModuleProbe (UI, two-column diff)
@@ -88,6 +92,10 @@ if /I "%~1"=="qr"      set "TARGET_CLASS=com.bytefuture.toolnest.QrTest"
 if /I "%~1"=="smoke"   set "TARGET_CLASS=com.bytefuture.toolnest.SmokeTestLauncher"
 if /I "%~1"=="json"    set "TARGET_CLASS=com.bytefuture.toolnest.JsonProbeLauncher"
 if /I "%~1"=="body"    set "TARGET_CLASS=com.bytefuture.toolnest.features.http.HttpBodyProbeLauncher"
+if /I "%~1"=="httpfix" set "TARGET_CLASS=com.bytefuture.toolnest.features.http.HttpFixProbeLauncher"
+if /I "%~1"=="httplayout" set "TARGET_CLASS=com.bytefuture.toolnest.features.http.HttpBatchLayoutProbeLauncher"
+if /I "%~1"=="httpsect" set "TARGET_CLASS=com.bytefuture.toolnest.features.http.HttpSectionsProbeLauncher"
+if /I "%~1"=="httpsingle" set "TARGET_CLASS=com.bytefuture.toolnest.features.http.HttpSingleUiProbeLauncher"
 if /I "%~1"=="qrpic"   set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode.QrModuleProbeLauncher"
 if /I "%~1"=="qrlist"  set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode.MultiQrProbeLauncher"
 if /I "%~1"=="sel"     set "TARGET_CLASS=com.bytefuture.toolnest.features.qrcode.SelectionE2EProbeLauncher"
@@ -159,6 +167,6 @@ goto :eof
 echo Usage:
 echo   verify.cmd compile        compile probes only
 echo   verify.cmd run ^<Class^>    compile then run a probe class
-echo   verify.cmd cron ^| cronui ^| tsui ^| image ^| qr ^| qrpic ^| qrlist ^| sel ^| json ^| body ^| nav ^| diff ^| diffui ^| preview ^| smoke
+echo   verify.cmd cron ^| cronui ^| tsui ^| image ^| qr ^| qrpic ^| qrlist ^| sel ^| json ^| body ^| httpfix ^| httpsect ^| httpsingle ^| httplayout ^| nav ^| diff ^| diffui ^| preview ^| smoke
 echo.
 exit /b 1

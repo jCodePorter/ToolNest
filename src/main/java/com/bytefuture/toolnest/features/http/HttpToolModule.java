@@ -4,14 +4,16 @@ import com.bytefuture.toolnest.core.ModuleCategory;
 import com.bytefuture.toolnest.ui.spi.ToolModule;
 import com.bytefuture.toolnest.ui.components.Icons;
 import com.bytefuture.toolnest.ui.components.UiKit;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 /**
@@ -68,6 +70,9 @@ public class HttpToolModule implements ToolModule {
     public Node buildContent() {
         VBox root = UiKit.page("HTTP 请求工具",
                 "支持单次调试与 CSV 批量执行，占位符写法 {列名}。");
+        // 页高由各段自己算：外层不能再叠加 VBox 间距，否则业务页签行
+        // 与下面的请求行之间会多出 16px，整页立刻溢出（见设计稿 §2 的面积预算）
+        root.setSpacing(0);
 
         singlePanel = new SingleRequestPanel();
         batchPanel = new BatchPanel();
@@ -84,6 +89,7 @@ public class HttpToolModule implements ToolModule {
         // 图标走自绘图标族而不是 Unicode「↑」：后者的字重来自字体本身，
         // 和相邻控件的线性图标摆在一起不是一套东西。
         Button carryOver = UiKit.secondaryButton("用当前请求作为批处理模板");
+        carryOver.getStyleClass().add("button-compact");
         carryOver.setGraphic(Icons.of("arrow-right", 14, "icon-muted"));
         carryOver.setOnAction(e -> {
             batchPanel.applyTemplate(singlePanel.snapshotSpec(),
@@ -91,13 +97,20 @@ public class HttpToolModule implements ToolModule {
             tabs.getSelectionModel().select(batchTab);
         });
 
-        // 右侧不再挂「{列名} 占位符」的说明 —— 请求行下方已经写了同一件事，
-        // 一屏里说两遍，读的人会以为两处规则不一样。
-        HBox switcher = new HBox(carryOver);
-        switcher.setAlignment(Pos.CENTER_LEFT);
+        // 并进业务页签行右侧。
+        // 它原来独占一行（按钮 32 + 间距 16 = 48），是 chrome 里最肥的一块；
+        // 而 TabPane 的页签区在皮肤内部，没有公开 API 能往这一行追加节点 ——
+        // 所以用 StackPane 叠一层，把按钮对齐到「顶部右侧」，
+        // 也就是页签轨道的右端（轨道高 38，按钮 32，上留 3 使两者中线重合）。
+        HBox tail = new HBox(carryOver);
+        tail.setAlignment(Pos.TOP_RIGHT);
+        tail.setPadding(new Insets(3, 0, 0, 0));
+        tail.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 
-        VBox.setVgrow(tabs, Priority.ALWAYS);
-        root.getChildren().addAll(switcher, tabs);
+        StackPane stack = new StackPane(tabs, tail);
+        StackPane.setAlignment(tail, Pos.TOP_RIGHT);
+        VBox.setVgrow(stack, Priority.ALWAYS);
+        root.getChildren().add(stack);
 
         // 面板销毁时释放线程池
         root.sceneProperty().addListener((o, oldScene, newScene) -> {

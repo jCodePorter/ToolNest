@@ -58,6 +58,41 @@ public final class BatchPanel extends VBox {
     private static final double RESULT_MIN_H = 340;
 
     /**
+     * 段① 内层页签（Params / Headers / Body）的高度。
+     *
+     * <p>154 = Body 页签内容 96（工具行 38 + 间距 8 + 编辑器 50）
+     * + {@code tab-content-area} 的 padding-top 14 + 页签轨道 43.33。
+     * 三个数都是实测的。
+     * <b>CSS 里必须写同一个值</b>（{@code .batch-tabs}）—— CSS 的 min/pref-height
+     * 一旦命中就会覆盖 Java 侧的 setter，两边不同步的话量到的是 CSS 那个值。
+     *
+     * <p>为什么不是单一请求页那个 312：那是给 210px 的请求体编辑器留的，
+     * 且段① 的 Params/Headers 要放得下 3 行 + 滚动条。
+     * 套 312 会让段① 涨到 411、整页 810，段③ 被整段推出视口更远。
+     */
+    private static final double TEMPLATE_TABS_H = 277;
+
+    /**
+     * 段① 键值表（Params / Headers）的高度。
+     *
+     * <p>174 = 表头 40 + 3 行 × 40 + 14（滚动条）。
+     * <b>行高 40</b> 是段① 专用（{@code .batch-kv .table-row-cell}），
+     * 全站其它表格仍是 34 —— 34 在只有两三行可见的矮表里显得挤，
+     * 行与行的分隔读不出来。
+     * 那 14 是<b>特意留给滚动条的</b>：行高变大后 3 行就填满，
+     * 不留这一条就看不到「下面还有」，用户会以为表就这么高。
+     */
+    private static final double BATCH_KV_H = 174;
+
+    /**
+     * Body 页签里 Form 键值表的高度。
+     *
+     * <p>与 {@link #BATCH_KV_H} 同档（表头 40 + 3 行 × 40 + 滚动条 14）——
+     * 同一页里两张表用同一个高度，切页签时表格不会「跳一下」。
+     */
+    private static final double BATCH_FORM_H = 174;
+
+    /**
      * 结果表五列的 pref 宽，合计 **520** —— 正好是规格里写的「结果表最小必需宽」。
      *
      * <p>实测可用宽只有 557（B 形态有竖滚动条）/ 563（A 形态），而 CONSTRAINED
@@ -169,11 +204,44 @@ public final class BatchPanel extends VBox {
     // ---- 段① 请求模板 ----
     private final ComboBox<HttpRequestSpec.Method> methodBox = new ComboBox<>();
     private final TextField urlField = new TextField();
-    private final ComboBox<HttpRequestSpec.BodyType> bodyTypeBox = new ComboBox<>();
+    /** 请求体类型：分段控件（不是下拉）—— 与单一请求页同一套控件词汇。 */
+    private final ToggleGroup bodyTypeGroup = new ToggleGroup();
     private final TextArea bodyArea = new TextArea();
-    /** 请求体降级的原因文字，挂在「请求体类型」那一行右侧。 */
+    /** 请求体降级的原因文字，挂在分段控件右侧（同一行，不新增行）。 */
     private Label bodyNote;
-    private final KeyValueTable headersTable = new KeyValueTable(130);
+    private final KeyValueTable headersTable = new KeyValueTable(BATCH_KV_H);
+    /** query 参数表（Params 页签）。 */
+    private final KeyValueTable paramsTable = new KeyValueTable(BATCH_KV_H);
+    /** Body 页签的实际内容（Form 用键值表，其余用文本区，切类型只切 visible）。 */
+    private final StackPane bodyTabContent = new StackPane();
+    /** 文本区类型（JSON / XML / Text / 无）下的请求体编辑区高度。 */
+    private static final double BODY_TEXT_H = 50;
+    private final Tab bodyTab = new Tab("Body");
+    private final Label placeholderTip = UiKit.caption(
+            "URL 与请求体中支持 {列名} 占位符，按 CSV 行替换。");
+    /** 请求体实际类型 → Content-Type 常驻显示。 */
+    private final Label ctypeLabel = UiKit.caption("");
+    /** Body 工具行右侧的动作槽（只有 JSON 类型有内容）。 */
+    private final HBox bodyActionSlot = new HBox(8);
+    /**
+     * 分段控件的按钮列表。
+     *
+     * <p>{@link ToggleGroup} 不是 {@code Iterable}，遍历不了选中项 ——
+     * 「用当前请求作为批处理模板」要按类型选中对应那一项，只能自己留一份列表。
+     */
+    private final List<ToggleButton> bodyTypeItems = new ArrayList<>();
+    /**
+     * Body 页签在 <b>Form</b> 类型下的编辑器 —— 与单一请求页同一张表。
+     *
+     * <p>批处理页原先五种类型共用一个文本区，选中 Form 也只能手填 {@code a=1&b=2}。
+     * 那与单一请求页「每个类型有自己专属的编辑器」的约定不一致，用户切过去
+     * 看到的东西完全变了样。现在 Form 也用表，填键值对。
+     */
+    private final FormDataTable formDataTable = new FormDataTable(0);
+    /** 段① 内层页签（探针要断言「三页签同名同序」与竖向高度）。 */
+    private TabPane templateTabs;
+    /** 请求体类型的分段控件（探针要断言「不是下拉」）。 */
+    private Node bodyTypeSegment;
 
     // ---- 段② CSV ----
     private final TextArea csvArea = new TextArea();
@@ -276,15 +344,46 @@ public final class BatchPanel extends VBox {
     // ============================================================ 段① 请求模板
 
     private void buildTemplateBody(VBox body) {
-        // 段① 竖向瘦身三处，合计 −30px（280 → 250）：
-        //   正文间距 10→8（−6）、正文 padding 12→8（−8，见 .stage-body-compact）、
-        //   请求体 TextArea 64→48（−16）。
-        // 目的：让「① + 10 + ②38 + 10 + ③」落回 653 的一屏内 —— 段① 280 时
-        // 整页会溢出 25px，段③ 底部被切掉一小截，结果表第 6 行只露一半。
-        // 注意：不是压 max-height（那会把 TextArea 挤成细条），是减内容本身。
+        // 段① 竖向预算（浏览器实测 244px）：
+        //   请求行 36 + 页签轨道 42 + 工具行 38 + 请求体 48 + 间距 8×3=24
+        //   + 正文上下内边距 16 = 正文 204；加卡片头 38 + 上下边框 2 = 244。
+        // 整页：244 + 10 + ②38 + 10 + ③340 = 642 ≤ 653，余 11px。
+        //
+        // 两次踩过的坑（都在浏览器里量出来、不是推算出来的）：
+        // ① 预算表曾把「正文 204」当成「卡片 204」，漏了头 38 和边框 2 ——
+        //    真实值 244，整页 642 才成立。尺子刻错比画布画错更危险。
+        // ② 请求体只能给 3 行（48）。给 4 行（76）时卡片 272 → 整页 670，
+        //    **超 653 预算 17px**，段③ 底部被切掉一小截。
+        // 所以：不是压 max-height（会把 TextArea 挤成细条），是减内容本身。
         body.setSpacing(8);
         body.getStyleClass().add("stage-body-compact");
 
+        body.getChildren().addAll(
+                buildTemplateRequestRow(),
+                buildTemplateTabs());
+
+        // 段收起后正文看不见了，头带摘要必须能读出「请求长什么样」
+        methodBox.valueProperty().addListener((o, a, b) -> refreshTemplateSummary());
+        urlField.textProperty().addListener((o, a, b) -> {
+            refreshTemplateSummary();
+            // 地址模板改了，占位符对不对得上的提示也要跟着变
+            refreshPlaceholderWarning();
+        });
+        bodyArea.textProperty().addListener((o, a, b) -> refreshPlaceholderWarning());
+        // 请求头 / query 参数里也可能写 {列名}，增删行时同步刷新提示
+        headersTable.setOnRowsCountChanged(n -> refreshPlaceholderWarning());
+        paramsTable.setOnRowsCountChanged(n -> refreshPlaceholderWarning());
+        refreshTemplateSummary();
+    }
+
+    /**
+     * 请求行：方法 + URL 占位符说明<b>同一行</b>，去掉 {@code field()} 左标签。
+     *
+     * <p>占位符说明不单起一行 —— 单起一行整页会超 653 预算（见 buildTemplateBody
+     * 开头）。单一请求页本来就这么做（{@code statusBox} 与请求行同行），
+     * 这里沿用同一做法。
+     */
+    private Node buildTemplateRequestRow() {
         methodBox.getItems().addAll(HttpRequestSpec.Method.values());
         methodBox.getSelectionModel().select(HttpRequestSpec.Method.GET);
         methodBox.getStyleClass().add("http-method");
@@ -296,55 +395,266 @@ public final class BatchPanel extends VBox {
         HBox.setHgrow(urlField, Priority.ALWAYS);
         urlField.setMaxWidth(Double.MAX_VALUE);
 
-        HBox urlRow = new HBox(8, methodBox, urlField);
-        urlRow.setAlignment(Pos.CENTER_LEFT);
+        HBox row = new HBox(8, methodBox, urlField, placeholderTip);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("http-hint-row");
+        return row;
+    }
 
-        // 只列批处理页真能处理的类型。Form-data / Binary 只有「路径」没有「值」，
-        // {列名} 占位符在它们身上没有意义 —— 列出来等于给一个点了会出错的入口。
-        bodyTypeBox.getItems().addAll(HttpRequestSpec.BodyType.batchTypes());
-        bodyTypeBox.getSelectionModel().select(HttpRequestSpec.BodyType.NONE);
-        bodyTypeBox.setPrefWidth(180);
-        // 请求体类型 = NONE 时整行降级。这里同样不能只把编辑区压暗（设计稿 §06-5
-        // 「禁用态必须配文字」）：用户填了内容却发不出去，界面上必须有一句话说明。
-        // 说明挂在「请求体类型」这一行右侧 —— 不新增一行，段① 的竖向预算刚好卡在
-        // 653 的一屏内（见 buildTemplateBody 开头的记账），多一行就要整页滚动。
-        bodyNote = UiKit.degradeNote("此项不生效（请求体类型为 NONE）");
-        bodyTypeBox.valueProperty().addListener((o, old, now) ->
-                applyBodyDegrade(now != HttpRequestSpec.BodyType.NONE));
+    /**
+     * 三页签：Params / Headers / Body —— 与单一请求页同名同序。
+     *
+     * <p>{@link #bodyTabContent} 是一个 {@link StackPane}：切页签只切
+     * visible+managed，各页签内容各自持有，来回切不丢（与单一请求页同一个道理）。
+     */
+    private Node buildTemplateTabs() {
+        Button addParams = compactSecondary("+ 新增参数");
+        addParams.setOnAction(e -> paramsTable.addRow());
+        Button clearParams = compactSecondary("清空");
+        clearParams.setOnAction(e -> paramsTable.clear());
+        // .batch-kv 是段① 表的样式作用域：行高 40 + 显式滚动条（见 app.css）
+        paramsTable.getStyleClass().add("batch-kv");
+        VBox paramsBox = new VBox(8,
+                toolRow(addParams, clearParams, UiKit.spacer(),
+                        UiKit.caption("这些键值会以 query 参数拼到 URL 之后")),
+                paramsTable);
+        VBox.setVgrow(paramsTable, Priority.ALWAYS);
 
+        Button addHeaders = compactSecondary("+ 新增请求头");
+        addHeaders.setOnAction(e -> headersTable.addRow());
+        Button clearHeaders = compactSecondary("清空");
+        clearHeaders.setOnAction(e -> headersTable.clear());
+        headersTable.getStyleClass().add("batch-kv");
+        VBox headersBox = new VBox(8,
+                toolRow(addHeaders, clearHeaders, UiKit.spacer(),
+                        UiKit.caption("常用请求头")),
+                headersTable);
+        VBox.setVgrow(headersTable, Priority.ALWAYS);
+
+        // Body 页签的内容 = 工具行 + 编辑器。
+        // 工具行必须**在页签内部**：它是「这一页的工具行」，与 Params / Headers
+        // 页签里的工具行同一个位置。放到 TabPane 外面会变成
+        // 「页签+编辑器」一块、「工具行」一块 —— 工具行跑到编辑器下面去了，
+        // 而用户切页签时它也不该跟着换页。
+        Node bodyToolRow = buildBodyToolRow();
+
+        // 编辑器 slot：Form 用键值表，其余类型用文本区。
+        // 二者叠在同一个 StackPane 里，切类型只切 visible+managed ——
+        // 与单一请求页 editorHolder 同一个做法，**各自内容不丢**：
+        // 在 Form 里填的键值对，切到 JSON 再切回来还在。
+        formDataTable.getStyleClass().add("batch-kv");
+        formDataTable.setFileRowsAllowed(false);
+        formDataTable.setOnChanged(this::refreshPlaceholderWarning);
+        bodyTabContent.getChildren().addAll(bodyArea, formDataTable);
+        VBox.setVgrow(bodyArea, Priority.ALWAYS);
+        VBox.setVgrow(formDataTable, Priority.ALWAYS);
+
+        VBox bodyBox = new VBox(8, bodyToolRow, bodyTabContent);
+        VBox.setVgrow(bodyTabContent, Priority.ALWAYS);
+        // bodyBox 不写死高度，让它按内容算（工具行 38 + 间距 8 + 编辑器）。
+        // 写死一个与内容差 2px 的值，那 2px 正好把编辑器顶出可视区 ——
+        // 探针量编辑器仍报 50px（节点在、尺寸对），但截图上完全看不见。
+        // 这就是「结构断言全绿 ≠ 长得对」：量高度量不到「被父容器裁掉」。
+        bodyBox.setMaxHeight(Double.MAX_VALUE);
+        bodyTab.setContent(bodyBox);
+        showBodyEditor(HttpRequestSpec.BodyType.NONE);
+
+        Tab paramsTab = new Tab("Params", paramsBox);
+        Tab headersTab = new Tab("Headers", headersBox);
+
+        TabPane tabs = new TabPane(paramsTab, headersTab, bodyTab);
+        templateTabs = tabs;
+        // 不能用 .http-req-tabs —— 那个类钉死 312（单一请求页的档），
+        // 套过来段① 会从 244 涨到 456，整页 855，段③ 被推出视口。
+        tabs.getStyleClass().add("batch-tabs");
+        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        // 段① 只有 Body 一个数据页签，默认就选中它
+        tabs.getSelectionModel().select(bodyTab);
+        // 内层数据页签要在段① 剩余高度里自然生长，不能按内容算完就缩回去。
+        // CSS 里也写了同一个值 277：CSS 一旦命中就会覆盖 Java 侧的 setter，
+        // 两边不同步的话量到的就是 CSS 那个值。
+        tabs.setPrefHeight(TEMPLATE_TABS_H);
+        tabs.setMinHeight(TEMPLATE_TABS_H);
+        tabs.setMaxHeight(Double.MAX_VALUE);
+
+        paramsTab.textProperty().addListener((o, a, b) ->
+                paramsTab.setText("Params" + suffixOf(paramsTable.entryCount())));
+        headersTab.textProperty().addListener((o, a, b) ->
+                headersTab.setText("Headers" + suffixOf(headersTable.entryCount())));
+        return tabs;
+    }
+
+    /** 页签标题上的项数后缀（0 项时不带括号）。 */
+    private static String suffixOf(int count) {
+        return count > 0 ? " (" + count + ")" : "";
+    }
+
+    /**
+     * Body 工具行：分段控件 + Content-Type + 降级说明 + 动作槽。
+     *
+     * <p>只列 {@link HttpRequestSpec.BodyType#batchTypes()} 的 5 项 ——
+     * {@code FORM_DATA} / {@code BINARY} 只有「路径」没有「值」，
+     * {@code {列名}} 占位符在它们身上没有意义，列出来等于给一个点了会出错的入口。
+     */
+    private Node buildBodyToolRow() {
+        // 文案要短 —— 它与分段控件同一行，写长了会把 5 个项挤到换行
+        bodyNote = UiKit.degradeNote("此项不生效（类型为「无」）");
+
+        HBox row = new HBox(8);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("http-toolbar");
+        row.getChildren().addAll(buildBodyTypeSegment(), ctypeLabel, bodyNote,
+                UiKit.spacer(), bodyActionSlot);
+        refreshBodyActions();
+        refreshCtypeLabel();
+
+        // 降级态下 TextArea 没有 placeholder 可用（那 API 在 TextField 上），
+        // 所以提示写进 promptText：淡到 42% 时它仍然读得到，
+        // 用户能看出「下面还有个框，只是还没启用」而不是以为根本没这一栏。
         bodyArea.setPromptText("请求体模板，例如 {\"orderId\": \"{orderId}\"}");
         bodyArea.getStyleClass().add("mono-area");
         bodyArea.setWrapText(true);
-        // 48px ≈ 3 行：请求体模板通常就是一行 JSON，且默认降级（未选 body 类型）
+        // 48px ≈ 3 行：给 4 行整页会超预算（见 buildTemplateBody 开头的记账）
         bodyArea.setPrefHeight(48);
         applyBodyDegrade(false);
+        return row;
+    }
 
-        TitledPane headersPane = new TitledPane("请求头 (Headers)", headersTable);
-        headersPane.getStyleClass().add("folder-pane");
-        headersPane.setExpanded(false);
+    /** 请求体类型的分段控件（与单一请求页 .http-type-seg 同一档）。 */
+    private Node buildBodyTypeSegment() {
+        HBox seg = new HBox(2);
+        seg.getStyleClass().addAll("segmented", "http-type-seg");
+        for (HttpRequestSpec.BodyType type : HttpRequestSpec.BodyType.batchTypes()) {
+            ToggleButton item = new ToggleButton(type.label());
+            item.setToggleGroup(bodyTypeGroup);
+            item.setUserData(type);
+            item.getStyleClass().add("segmented-item");
+            bodyTypeItems.add(item);
+            if (type == HttpRequestSpec.BodyType.NONE) {
+                item.setSelected(true);
+            }
+            item.selectedProperty().addListener((o, was, now) -> {
+                if (Boolean.TRUE.equals(now)) {
+                    applyBodyDegrade(type != HttpRequestSpec.BodyType.NONE);
+                    // 切类型要同时切编辑器：Form 用键值表，其余用文本区
+                    showBodyEditor(type);
+                    refreshBodyTabTitle();
+                    refreshCtypeLabel();
+                }
+            });
+            seg.getChildren().add(item);
+        }
+        bodyTypeSegment = seg;
+        return seg;
+    }
 
-        HBox bodyTypeRow = UiKit.fieldRow("请求体类型", bodyTypeBox);
-        bodyTypeRow.getChildren().add(bodyNote);
+    /** 动作槽：JSON 类型给「格式化」，其余为空（旧版此处的按钮点了没反应）。 */
+    private void refreshBodyActions() {
+        HBox slot = bodyActionSlot;
+        slot.getChildren().clear();
+        if (declaredType() == HttpRequestSpec.BodyType.JSON) {
+            Button format = compactSecondary("格式化");
+            format.setOnAction(e -> formatJsonBody());
+            slot.getChildren().add(format);
+        }
+    }
 
-        // 段① 不封顶、不套内层滚动：四个节点按 pref 自然生长，装不下时
-        // 由外层唯一的 ScrollPane 整页滚（见类注释的「竖向预算」）。
-        body.getChildren().addAll(
-                UiKit.field("请求地址模板", urlRow),
-                bodyTypeRow,
-                bodyArea,
-                headersPane);
+    /** Body 页签标题带上项数与类型（段收起后仍能读出「请求长什么样」）。 */
+    private void refreshBodyTabTitle() {
+        HttpRequestSpec.BodyType type = declaredType();
+        // 批处理页的请求体是**一段模板**，不是「若干项」——
+        // 写「(1 项)」会让人以为是表单字段数。写「有内容 / 空」才读得对。
+        boolean hasBody = bodyArea.getText() != null && !bodyArea.getText().isBlank();
+        bodyTab.setText("Body · " + type.label() + (hasBody ? "（有内容）" : ""));
+    }
 
-        // 段收起后正文看不见了，头带摘要必须能读出「请求长什么样」
-        methodBox.valueProperty().addListener((o, a, b) -> refreshTemplateSummary());
-        urlField.textProperty().addListener((o, a, b) -> {
-            refreshTemplateSummary();
-            // 地址模板改了，占位符对不对得上的提示也要跟着变
-            refreshPlaceholderWarning();
-        });
-        bodyArea.textProperty().addListener((o, a, b) -> refreshPlaceholderWarning());
-        // 请求头里也可能写 {列名}，增删行时同步刷新提示
-        headersTable.setOnRowsCountChanged(n -> refreshPlaceholderWarning());
-        refreshTemplateSummary();
+    /** Content-Type 常驻位：把这一类型的真实 Content-Type 说出来。 */
+    private void refreshCtypeLabel() {
+        HttpRequestSpec.BodyType type = declaredType();
+        ctypeLabel.setText(type == HttpRequestSpec.BodyType.NONE ? "" : type.contentType());
+        ctypeLabel.setVisible(!ctypeLabel.getText().isEmpty());
+        ctypeLabel.setManaged(ctypeLabel.isVisible());
+    }
+
+    /**
+     * 按请求体类型切 Body 页签的编辑器。
+     *
+     * <p>Form → 键值表（与单一请求页同一张 {@link FormDataTable}），
+     * 其余 → 文本区。二者都在 {@link #bodyTabContent} 这个 StackPane 里，
+     * 只切 visible+managed，**各自内容各自持有**（与单一请求页
+     * {@code editorHolder} 同一个做法）——在 Form 里填的键值对，
+     * 切到 JSON 再切回来还在。
+     *
+     * <p>内容区高度也跟着换：文本区 50、Form 表 174（3 行 × 40 + 表头 + 滚动条）。
+     */
+    private void showBodyEditor(HttpRequestSpec.BodyType type) {
+        boolean useForm = type == HttpRequestSpec.BodyType.FORM;
+        setShown(bodyArea, !useForm);
+        setShown(formDataTable, useForm);
+        double h = useForm ? BATCH_FORM_H : BODY_TEXT_H;
+        bodyTabContent.setPrefHeight(h);
+        bodyTabContent.setMinHeight(h);
+    }
+
+    /** visible + managed 必须成对切 —— 只切 visible 会留下空白带。 */
+    private static void setShown(Node node, boolean shown) {
+        node.setVisible(shown);
+        node.setManaged(shown);
+    }
+
+    /** 选中分段控件里对应类型的那一项（供「用当前请求作为批处理模板」调用）。 */
+    private void selectBodyType(HttpRequestSpec.BodyType type) {
+        for (ToggleButton item : bodyTypeItems) {
+            if (item.getUserData() == type) {
+                item.setSelected(true);
+                return;
+            }
+        }
+    }
+
+    /** 界面上选的请求体类型（分段控件的选中项）。 */
+    private HttpRequestSpec.BodyType declaredType() {
+        Toggle selected = (Toggle) bodyTypeGroup.getSelectedToggle();
+        if (selected == null || selected.getUserData() == null) {
+            return HttpRequestSpec.BodyType.NONE;
+        }
+        return (HttpRequestSpec.BodyType) selected.getUserData();
+    }
+
+    /** 格式化请求体（JSON 缩进）。批处理页的占位符是合法的 JSON 字符串值。 */
+    private void formatJsonBody() {
+        String text = bodyArea.getText();
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        java.io.StringWriter out = new java.io.StringWriter();
+        try {
+            com.google.gson.JsonElement parsed =
+                    com.google.gson.JsonParser.parseString(text);
+            // 缩进由 JsonWriter 负责，不要后处理替换（会连字符串值里的空白一起改）
+            com.google.gson.stream.JsonWriter writer =
+                    new com.google.gson.stream.JsonWriter(out);
+            writer.setIndent("  ");
+            com.google.gson.internal.Streams.write(parsed, writer);
+            bodyArea.setText(out.toString());
+        } catch (java.io.IOException | RuntimeException notJson) {
+            // 不是合法 JSON 就不动它 —— 静默改写用户的模板比不格式化更糟
+        }
+    }
+
+    /** 工具行：按钮 + 弹性空隙 + 右侧说明文字（38px 那一档）。 */
+    private static HBox toolRow(Node... nodes) {
+        HBox row = new HBox(8, nodes);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("http-toolbar");
+        return row;
+    }
+
+    /** 比标准档矮一档的次要按钮（段控件 32 / 标准 32 那一档）。 */
+    private static Button compactSecondary(String text) {
+        Button button = UiKit.secondaryButton(text);
+        button.getStyleClass().add("button-compact");
+        return button;
     }
 
     /**
@@ -356,7 +666,10 @@ public final class BatchPanel extends VBox {
      * 并同步切换右侧那句原因文字。
      */
     private void applyBodyDegrade(boolean enabled) {
+        // 两个编辑器都要降级 —— 切到 Form 时文本区是隐藏的那个，
+        // 只降 bodyArea 会出现「选 Form 但表单不降级」的不一致。
         UiKit.setDegraded(bodyArea, null, !enabled);
+        UiKit.setDegraded(formDataTable, null, !enabled);
         if (bodyNote != null) {
             bodyNote.setVisible(!enabled);
             bodyNote.setManaged(!enabled);
@@ -863,19 +1176,95 @@ public final class BatchPanel extends VBox {
         if (currentTable == null) {
             return;
         }
-        HttpRequestSpec.BodyType bodyType = HttpRequestSpec.inferBodyType(
-                bodyTypeBox.getValue(), bodyArea.getText());
+        HttpRequestSpec.BodyType declared = declaredType();
         List<Map.Entry<String, String>> baseHeaders = headersTable.entries();
+        List<Map.Entry<String, String>> baseParams = paramsTable.entries();
         String url = urlField.getText();
         int index = 1;
         for (Map<String, String> vars : currentTable.rows) {
+            // 键值按 CSV 行替换后进 formFields —— 引擎的 FORM 分支
+            // 会对它们做百分号编码（空格 → +）。不这么做的话，
+            // Form 的键值就永远进不了请求体。
+            List<Map.Entry<String, String>> formFields =
+                    resolveFormFields(declared, vars);
+            String body = declared == HttpRequestSpec.BodyType.FORM
+                    ? ""
+                    : TemplateResolver.resolve(bodyArea.getText(), vars);
+            HttpRequestSpec.BodyType bodyType = HttpRequestSpec.inferBodyType(declared, body);
             HttpRequestSpec spec = new HttpRequestSpec(
                     methodBox.getValue(),
-                    TemplateResolver.resolve(url, vars),
+                    appendQuery(TemplateResolver.resolve(url, vars),
+                            resolveFormFieldsEntries(baseParams, vars)),
                     bodyType,
-                    TemplateResolver.resolve(bodyArea.getText(), vars));
+                    body,
+                    formFields,
+                    List.of(),
+                    null);
             resultRows.add(new ResultRow(index++, vars, spec, resolveHeaders(baseHeaders, vars)));
         }
+    }
+
+    /** Form 类型下、按键替换后的键值对；其它类型返回空列表。 */
+    private List<Map.Entry<String, String>> resolveFormFields(
+            HttpRequestSpec.BodyType declared, Map<String, String> vars) {
+        if (declared != HttpRequestSpec.BodyType.FORM) {
+            return List.of();
+        }
+        return resolveFormFieldsEntries(formDataTableTextFields(), vars);
+    }
+
+    /** Form 表里的**文本段**键值（batchTypes 里没有 Form-data，所以全是文本段）。 */
+    private List<Map.Entry<String, String>> formDataTableTextFields() {
+        List<Map.Entry<String, String>> list = new ArrayList<>();
+        for (HttpRequestSpec.FormField field : formDataTable.fields()) {
+            if (!field.isFile()) {
+                list.add(new java.util.AbstractMap.SimpleEntry<>(
+                        field.name, field.text == null ? "" : field.text));
+            }
+        }
+        return list;
+    }
+
+    private List<Map.Entry<String, String>> resolveFormFieldsEntries(
+            List<Map.Entry<String, String>> src, Map<String, String> vars) {
+        List<Map.Entry<String, String>> list = new ArrayList<>();
+        for (Map.Entry<String, String> e : src) {
+            list.add(new java.util.AbstractMap.SimpleEntry<>(
+                    TemplateResolver.resolve(e.getKey(), vars),
+                    TemplateResolver.resolve(e.getValue(), vars)));
+        }
+        return list;
+    }
+
+    /**
+     * 把 query 参数拼到 URL 后面。
+     *
+     * <p>Params 页签一直存在，但值以前<b>根本没有进请求</b> ——
+     * {@code prepareResultRows} 只读了 url / headers / body 三处。
+     * 那一页写着「这些键值会以 query 参数拼到 URL 之后」，说的却没做到。
+     * 顺带在这里补上：URL 已带 {@code ?} 就用 {@code &}，否则用 {@code ?}。
+     */
+    private static String appendQuery(String url, List<Map.Entry<String, String>> params) {
+        if (params.isEmpty()) {
+            return url;
+        }
+        StringBuilder sb = new StringBuilder(url);
+        boolean first = !url.contains("?");
+        for (Map.Entry<String, String> p : params) {
+            if (p.getKey() == null || p.getKey().isBlank()) {
+                continue;
+            }
+            sb.append(first ? '?' : '&');
+            first = false;
+            sb.append(encodeQuery(p.getKey())).append('=')
+                    .append(encodeQuery(p.getValue() == null ? "" : p.getValue()));
+        }
+        return sb.toString();
+    }
+
+    /** query 参数的百分号编码（与引擎的 encodeForm 同一套，空格 → +）。 */
+    private static String encodeQuery(String value) {
+        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /**
@@ -1013,7 +1402,7 @@ public final class BatchPanel extends VBox {
         // 不存在的选项，会让用户以为模板带过来了。
         HttpRequestSpec.BodyType type = HttpRequestSpec.BodyType.batchTypes()
                 .contains(spec.bodyType) ? spec.bodyType : HttpRequestSpec.BodyType.NONE;
-        bodyTypeBox.getSelectionModel().select(type);
+        selectBodyType(type);
         if (type != spec.bodyType) {
             showError("单一请求页选的是「" + spec.bodyType.label()
                     + "」，批处理暂不支持该类型（文件字段没有可替换的值），已改为「无请求体」。");
@@ -1099,6 +1488,156 @@ public final class BatchPanel extends VBox {
 
     TextField urlFieldForTest() {
         return urlField;
+    }
+
+    /** 测试用：方法下拉（探针要断言 URL 是请求行里最宽的元素）。 */
+    ComboBox<HttpRequestSpec.Method> methodBoxForTest() {
+        return methodBox;
+    }
+
+    /** 测试用：段① 的内层页签（Params / Headers / Body）。 */
+    TabPane templateTabsForTest() {
+        return templateTabs;
+    }
+
+    /** 测试用：Body 页签。 */
+    Tab bodyTabForTest() {
+        return bodyTab;
+    }
+
+    /** 测试用：请求体类型的分段控件。 */
+    Node bodyTypeSegmentForTest() {
+        return bodyTypeSegment;
+    }
+
+    /** 测试用：界面上选的请求体类型。 */
+    HttpRequestSpec.BodyType declaredBodyTypeForTest() {
+        return declaredType();
+    }
+
+    /** 测试用：选中分段控件里对应类型的那一项。 */
+    void selectBodyTypeForTest(HttpRequestSpec.BodyType type) {
+        selectBodyType(type);
+    }
+
+    /** 测试用：query 参数表。 */
+    KeyValueTable paramsTableForTest() {
+        return paramsTable;
+    }
+
+    /** 测试用：Form 用的那张键值表。 */
+    FormDataTable bodyFormTableForTest() {
+        return formDataTable;
+    }
+
+    /** 测试用：当前是否显示 Form 键值表（而不是文本区）。 */
+    boolean bodyFormTableVisibleForTest() {
+        return formDataTable.isVisible() && formDataTable.isManaged();
+    }
+
+    /** 测试用：按当前界面生成待执行行（占位符替换在这里发生）。 */
+    void prepareRowsForTest() {
+        prepareResultRows();
+    }
+
+    /** 测试用：第一条待执行行的请求描述（断「键值真的进了引擎模型」）。 */
+    HttpRequestSpec firstSpecForTest() {
+        return resultRows.isEmpty() ? null : resultRows.get(0).spec;
+    }
+
+    /** 测试用：请求头键值表。 */
+    KeyValueTable headersTableForTest() {
+        return headersTable;
+    }
+
+    /**
+     * 测试用：段① 的表能显示几行（行高 40 口径：{@code (表高 − 表头 40) ÷ 40}）。
+     *
+     * <p>上一版只有 0.14 行 —— 用户报「间距太小，无法输入内容」时实测就是 0。
+     * 判据要的是「至少 2 行」，因为 1 行只能看、不能改。
+     */
+    int headersVisibleRowsForTest() {
+        javafx.scene.control.TableView<?> view = headersTable.tableForTest();
+        double header = 40;
+        return (int) Math.floor((view.getHeight() - header) / 40);
+    }
+
+    /** 测试用：段① 表的行高（用户要求 34 → 40）。 */
+    double headersRowHeightForTest() {
+        javafx.scene.control.TableView<?> view = headersTable.tableForTest();
+        for (javafx.scene.Node node : view.lookupAll(".table-row-cell")) {
+            return node.getLayoutBounds().getHeight();
+        }
+        return -1;
+    }
+
+    /**
+     * 测试用：段① 的表在有多余行时**能滚**吗。
+     *
+     * <p>行高抬到 40 后 3 行就填满，不显式开滚动条用户就看不到「下面还有」。
+     * 判据是「有内容超出可视高度 且 竖滚动条可见」。
+     */
+    boolean headersTableScrollableForTest() {
+        javafx.scene.control.TableView<?> view = headersTable.tableForTest();
+        int rows = 0;
+        for (javafx.scene.Node node : view.lookupAll(".table-row-cell")) {
+            rows++;
+        }
+        if (rows <= headersVisibleRowsForTest()) {
+            return true;   // 内容没超出，不需要滚
+        }
+        // TableView 的滚动条 style class 只有 "scroll-bar" ——
+        // 竖/横是**伪类** :vertical / :horizontal，不是 style class，
+        // 所以 contains("vertical") 永远为 false。别用 style class 判方向。
+        for (javafx.scene.Node bar : view.lookupAll(".scroll-bar")) {
+            if (bar.isVisible() && bar.getOpacity() > 0.9
+                    && bar.getLayoutBounds().getWidth() < 20) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 测试用：请求体编辑区。 */
+    TextArea bodyAreaForTest() {
+        return bodyArea;
+    }
+
+    /**
+     * 测试用：请求体编辑器<b>完整落在 Body 页签的可视区内</b>吗。
+     *
+     * <p>为什么需要这条：{@code TabPane} 的 content-area 装不下时会把内容
+     * <b>裁掉</b>，而 {@code bodyArea.getHeight()} 仍然是 50px ——
+     * 节点在、尺寸对，探针量高度<b>量不到「被父容器裁掉」</b>。
+     * 本轮就这样翻过车：32 条断言全绿，截图上编辑器只剩一条边。
+     * 判据必须是「编辑器的底边没有超出它父容器的底边」。
+     */
+    boolean bodyEditorFullyVisibleForTest() {
+        if (bodyArea.getParent() == null) {
+            return false;
+        }
+        javafx.scene.control.TabPane tabs = templateTabs;
+        if (tabs == null) {
+            return false;
+        }
+        javafx.scene.layout.Region contentArea = null;
+        for (javafx.scene.Node node : tabs.lookupAll(".tab-content-area")) {
+            if (node instanceof javafx.scene.layout.Region region) {
+                contentArea = region;
+            }
+        }
+        if (contentArea == null) {
+            return false;
+        }
+        // 判据要跟 **TabPane 的 content-area** 比，不能跟 bodyTabContent 比：
+        // bodyTabContent 自己也会被压扁，跟它比永远「没超出」——
+        // 这条断言在 TabPane 只有 110 时实测仍为 true，等于恒真。
+        javafx.geometry.Bounds editor =
+                bodyArea.localToScene(bodyArea.getBoundsInLocal());
+        javafx.geometry.Bounds host =
+                contentArea.localToScene(contentArea.getBoundsInLocal());
+        return editor.getMaxY() <= host.getMaxY() + 0.5
+                && bodyArea.getHeight() >= 40;
     }
 
     ScrollPane outerScrollForTest() {

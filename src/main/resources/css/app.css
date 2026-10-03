@@ -1642,6 +1642,34 @@
     -fx-background-color: transparent;
 }
 
+/* 段① 的键值表：行高 34 → 40。
+   34 是全站口径（DESIGN.md §5），但段① 的表要在**很矮的页签区**里
+   承担「输入」职责 —— 34px 一行在只有 2~3 行可见时显得挤，行与行的
+   分隔读不出来。段① 单独抬到 40，不影响其它表格的既有口径。
+   行数换算也随之变：(表体高 − 40) ÷ 40。 */
+.batch-kv .table-view .table-row-cell {
+    -fx-cell-size: 40px;
+}
+
+/* 段① 的表要显式看到滚动条：AtlantaFX 默认给滚动条叠了不透明度，
+   在这个高度的表里会淡到看不见，用户以为「下面还有内容但滚不了」。
+   与 .detail-scroll 同一条理由。 */
+.batch-kv .table-view .scroll-bar:vertical,
+.batch-kv .table-view .scroll-bar:horizontal {
+    -fx-opacity: 1;
+}
+
+.batch-kv .table-view .table-cell {
+    -fx-padding: 3 10;
+}
+
+/* 行高 40 后单元格里的常驻输入框要跟着抬高一档，
+   否则 26px 的框浮在 40px 行里，上下留白不匀。 */
+.batch-kv .table-view .table-cell .text-field {
+    -fx-pref-height: 32px;
+    -fx-min-height: 32px;
+}
+
 .table-view .table-row-cell:odd {
     -fx-background-color: -dt-row-alt;
 }
@@ -2264,6 +2292,33 @@
 .http-req-tabs {
     -fx-min-height: 312px;
     -fx-pref-height: 312px;
+}
+
+/* ---------- 批处理段① 的内层页签（Params / Headers / Body）----------
+   不能复用 .http-req-tabs —— 那个类把高度钉死在 312（单一请求页的
+   「请求体编辑器 210 + 页签头 42 + 余量」），套到批处理段① 上会让
+   段① 从设计的 244 涨到 456，整页从 642 涨到 855，段③ 被整段推出视口。
+
+   154 = Body 页签内容 96（工具行 38 + 间距 8 + 编辑器 50）
+       + tab-content-area 的 padding-top 14
+       + 页签轨道 43.33（实测，不是估的）。
+   三个数都是**实测**的：少任何一个，编辑器就被父容器裁掉 ——
+   而探针量 bodyArea 仍然报 50px（节点在、尺寸都对），只有截图能看出来。
+   **量高度量不到「被父容器裁掉」，这类问题只能靠肉眼过。**
+
+   高度必须写在 CSS 里：Region 的 prefHeight 一旦被 CSS 命中，
+   Java 侧的 setPrefHeight 会被覆盖（所以 Java 那边也写一遍，两边同值）。 */
+.batch-tabs {
+    -fx-min-height: 277px;
+    -fx-pref-height: 277px;
+}
+
+/* 批处理段① 的内层页签轨道：比单一请求页矮一档。
+   单一请求页的 42 档是给 210px 编辑区留的，段① 只有 48px 编辑区，
+   轨道跟着抬高一档就白吃 4px 竖向预算。 */
+.batch-tabs > .tab-header-area > .headers-region > .tab {
+    -fx-padding: 6 12 5 12;
+    -fx-font-size: 12px;
 }
 
 /* 响应页签：配置态保底 132（页签头 56 + 完整空态 76）；

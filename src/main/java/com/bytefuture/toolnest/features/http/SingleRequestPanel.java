@@ -77,9 +77,13 @@ public final class SingleRequestPanel extends VBox {
     private final TextArea bodyArea = new TextArea();
     /** 类型 = NONE 时的空态。 */
     private final VBox bodyNoneState;
-    /** 类型 = Form 的键值表。 */
-    private final KeyValueTable formTable = new KeyValueTable(210);
-    /** 类型 = Form-data 的逐行「文本 / 文件」表。 */
+    /**
+     * Form / Form-data <b>共用</b>的字段表（仿 Postman：两个类型选项，同一张表）。
+     *
+     * <p>选 Form 时隐藏「类型」列并整表按文本段编码；选 Form-data 时显示
+     * 「类型」列，可逐行切文本 / 文件。两种类型的内容始终是同一份 ——
+     * 旧版给 Form 单独一张键值表，切类型就换节点，来回切要重打一遍。
+     */
     private final FormDataTable formDataTable = new FormDataTable(210);
     /** 类型 = Binary 的单文件选择器。 */
     private final Label binaryName = new Label("尚未选择文件");
@@ -98,8 +102,10 @@ public final class SingleRequestPanel extends VBox {
     private final HBox statusBox = new HBox(6);
     private final HBox actionSlot = new HBox(8);
     private final Button jsonFormatBtn = compactSecondary("格式化");
+    /** 「+ Token」快捷按钮（Headers 工具行）。 */
+    private Button tokenHeader;
+    private final Button formAddBtn = compactSecondary("+ 新增字段");
     private final Button formClearBtn = compactSecondary("清空");
-    private final Button formDataClearBtn = compactSecondary("清空");
     private final Button binaryPickBtn = compactSecondary("更换");
     private final Button binaryClearBtn = compactSecondary("清除");
 
@@ -197,7 +203,7 @@ public final class SingleRequestPanel extends VBox {
         strip.setManaged(false);
         hideError();
 
-        selectBodyType(HttpRequestSpec.BodyType.NONE, false);
+        selectBodyType(HttpRequestSpec.BodyType.NONE);
         refreshToolRow();
         setResponded(false);
     }
@@ -254,16 +260,25 @@ public final class SingleRequestPanel extends VBox {
 
     private Node buildRequestTabs() {
         // ---- Params ----
+        Button addParams = compactSecondary("+ 新增参数");
+        addParams.setOnAction(e -> paramsTable.addRow());
         Button clearParams = compactSecondary("清空");
         clearParams.setOnAction(e -> paramsTable.clear());
 
         VBox paramsBox = new VBox(8,
-                toolRow(clearParams, UiKit.spacer(),
+                toolRow(addParams, clearParams, UiKit.spacer(),
                         UiKit.caption("这些键值会以 query 参数拼到 URL 之后")),
                 paramsTable);
         VBox.setVgrow(paramsTable, Priority.ALWAYS);
 
         // ---- Headers ----
+        // Authorization 的值在失焦时补 Bearer 前缀：用户粘贴裸 token 后
+        // 点别处即可，不用记得自己敲前缀。
+        // 必须按 key 分派 —— Content-Type 的值不能被套上 Bearer 前缀。
+        headersTable.setValueNormalizer(SingleRequestPanel::normalizeHeaderValue);
+
+        Button addHeaders = compactSecondary("+ 新增请求头");
+        addHeaders.setOnAction(e -> headersTable.addRow());
         Button clearHeaders = compactSecondary("清空");
         clearHeaders.setOnAction(e -> headersTable.clear());
 
@@ -273,8 +288,21 @@ public final class SingleRequestPanel extends VBox {
             refreshToolRow();
         });
 
+        tokenHeader = compactSecondary("+ Token");
+        tokenHeader.setAccessibleText("添加 Authorization 请求头");
+        tokenHeader.setOnAction(e -> {
+            // 先落 key、把值留空，焦点送进 VALUE 格 —— 用户直接打 token 即可。
+            // 不预填 "Bearer "：那会让用户看到一条半截的值，还得自己删掉再打，
+            // 而且复制出去时也会带上这个占位前缀。
+            int row = headersTable.addEntry("Authorization", "", null);
+            if (row >= 0) {
+                headersTable.focusCell(row, 1);
+            }
+            refreshToolRow();
+        });
+
         VBox headersBox = new VBox(8,
-                toolRow(jsonHeader, clearHeaders, UiKit.spacer(),
+                toolRow(jsonHeader, tokenHeader, addHeaders, clearHeaders, UiKit.spacer(),
                         UiKit.caption("常用请求头")),
                 headersTable);
         VBox.setVgrow(headersTable, Priority.ALWAYS);
@@ -302,7 +330,6 @@ public final class SingleRequestPanel extends VBox {
         headersTable.setOnRowsCountChanged(n ->
                 headersTab.setText("Headers" + (n > 0 ? " (" + n + ")" : "")));
         formDataTable.setOnChanged(this::refreshBodyTabTitle);
-        formTable.setOnRowsCountChanged(n -> refreshBodyTabTitle());
         return requestTabs;
     }
 
@@ -336,7 +363,7 @@ public final class SingleRequestPanel extends VBox {
                     item.setSelected(true);
                     return;
                 }
-                selectBodyType(type, true);
+                selectBodyType(type);
             });
             typeButtons.put(type, item);
             seg.getChildren().add(item);
@@ -351,8 +378,8 @@ public final class SingleRequestPanel extends VBox {
         // 动作槽：只放「当前类型真的可用」的动作。
         // 旧版把「格式化」常量显示在非 JSON 类型下，点了没反应。
         jsonFormatBtn.setOnAction(e -> toggleRequestFormat());
-        formClearBtn.setOnAction(e -> formTable.clear());
-        formDataClearBtn.setOnAction(e -> formDataTable.clear());
+        formAddBtn.setOnAction(e -> formDataTable.addRow());
+        formClearBtn.setOnAction(e -> formDataTable.clear());
         binaryPickBtn.setOnAction(e -> chooseBinaryFile());
         binaryClearBtn.setOnAction(e -> {
             binaryPath = null;
@@ -370,10 +397,9 @@ public final class SingleRequestPanel extends VBox {
     private void buildEditorSlot() {
         editorHolder.getStyleClass().add("http-editor");
         editorHolder.setFillWidth(true);
-        editorHolder.getChildren().addAll(bodyNoneState, bodyArea, formTable, formDataTable,
+        editorHolder.getChildren().addAll(bodyNoneState, bodyArea, formDataTable,
                 binaryEditor);
         VBox.setVgrow(bodyArea, Priority.ALWAYS);
-        VBox.setVgrow(formTable, Priority.ALWAYS);
         VBox.setVgrow(formDataTable, Priority.ALWAYS);
     }
 
@@ -441,7 +467,7 @@ public final class SingleRequestPanel extends VBox {
      * </ul>
      * 每种类型的模型各自独立持有，切换只换可见节点，内容一个都不丢。
      */
-    private void selectBodyType(HttpRequestSpec.BodyType type, boolean userGesture) {
+    private void selectBodyType(HttpRequestSpec.BodyType type) {
         ToggleButton item = typeButtons.get(type);
         if (item != null) {
             item.setSelected(true);
@@ -452,6 +478,9 @@ public final class SingleRequestPanel extends VBox {
             case TEXT -> "纯文本请求体";
             default -> "请求体内容";
         });
+        // Form（x-www-form-urlencoded）传不了文件 → 隐藏「类型」列；
+        // Form-data 逐行可选文本 / 文件。两种类型共用同一张表。
+        formDataTable.setFileRowsAllowed(type == HttpRequestSpec.BodyType.FORM_DATA);
         showEditor(type);
         // 类型 = 无时整组降透明 + 空态文案说明原因（不是 setDisable）：
         // 设计稿 §7「禁用态必须配文字，不能只做 setDisable」
@@ -459,9 +488,6 @@ public final class SingleRequestPanel extends VBox {
         refreshToolRow();
         refreshBodyTabTitle();
         refreshEmptyHint();
-        if (userGesture) {
-            formDataTable.tableForTest().refresh();
-        }
     }
 
     /** 逐类型切换可见的编辑器。 */
@@ -478,8 +504,9 @@ public final class SingleRequestPanel extends VBox {
     private Node editorFor(HttpRequestSpec.BodyType type) {
         return switch (type) {
             case NONE -> bodyNoneState;
-            case FORM -> formTable;
-            case FORM_DATA -> formDataTable;
+            // Form 与 Form-data 共用一张表（Postman 的做法）：
+            // 区别只是「行里能不能选文件」，由 setFileRowsAllowed 控制。
+            case FORM, FORM_DATA -> formDataTable;
             case BINARY -> binaryEditor;
             default -> bodyArea;
         };
@@ -547,6 +574,66 @@ public final class SingleRequestPanel extends VBox {
      *       现在明写一句。</li>
      * </ol>
      */
+    /**
+     * 请求头值的失焦规范化 —— <b>只对 {@code Authorization} 生效</b>。
+     *
+     * <p>其余头一律原样返回：{@code Content-Type: application/json} 这种值
+     * 里没有空白，若也套「裸 token 就补前缀」的规则，会被改成
+     * {@code Bearer application/json} —— 把一条本来正确的头改坏。
+     */
+    static String normalizeHeaderValue(String key, String value) {
+        if (key == null || !"Authorization".equalsIgnoreCase(key.trim())) {
+            return value;
+        }
+        return withBearer(value);
+    }
+
+    /**
+     * 补上 {@code Authorization} 的认证方案前缀。
+     *
+     * <p>用户从别处粘来的 token 往往只有裸串（{@code eyJhbGciOi...}），
+     * 直接发出去服务端会认不出。而已经带前缀的不该被改写成
+     * {@code Bearer Bearer xxx}。
+     *
+     * <h2>为什么判「有没有 scheme」而不是判「有没有 Bearer」</h2>
+     * <p>{@code Authorization} 的 scheme 是 HTTP 规范里的
+     * <b>token</b>（{@code Basic} / {@code Bearer} / {@code Digest} / {@code Token} ...），
+     * 不是只有 Bearer 一种。用 {@code contains("Bearer")} 判断会漏掉
+     * {@code Basic dXNlcjpwYXNz} 这种 —— 它不含 "Bearer"，于是被错加成
+     * {@code Bearer Basic dXNlcjpwYXNz}，把一个能用的头改成必然被拒的头。
+     *
+     * <p>所以判据是「首个空白之前是否已经是一个合法 scheme」：有就原样保留，
+     * 没有就把裸串当作 token，补上 {@code Bearer }。
+     *
+     * <p>所以判据分两步：<b>整串没有空白 → 它就是一个裸 token</b>（JWT 形如
+     * {@code aaa.bbb.ccc}，没有空格），直接补前缀；有空白才看首段是不是合法 scheme。
+     * 第一步不能省 —— JWT 里全是 {@code . _ -} 这些 scheme 合法字符，
+     * 只按「首段是否合法」判会把整个 JWT 误当成一个 scheme 而漏掉前缀。
+     *
+     * <p>空串返回 {@code ""}（不补）：那是用户还没打字的空行，补上前缀会
+     * 让表里凭空出现一条 {@code Authorization: Bearer }。
+     */
+    static String withBearer(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.strip();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        int space = trimmed.indexOf(' ');
+        if (space < 0) {
+            return "Bearer " + trimmed;
+        }
+        String head = trimmed.substring(0, space);
+        // RFC 7235 token：首字符必须是字母，其余是字母数字与 - . _ ~ + /
+        boolean hasScheme = !head.isEmpty()
+                && Character.isLetter(head.charAt(0))
+                && head.chars().skip(1).allMatch(c -> Character.isLetterOrDigit(c)
+                        || c == '-' || c == '.' || c == '_' || c == '~' || c == '+' || c == '/');
+        return hasScheme ? trimmed : "Bearer " + trimmed;
+    }
+
     private void refreshToolRow() {
         HttpRequestSpec.BodyType declared = declaredType();
         HttpRequestSpec.BodyType effective = effectiveType();
@@ -555,8 +642,7 @@ public final class SingleRequestPanel extends VBox {
         actionSlot.getChildren().clear();
         switch (declared) {
             case JSON -> actionSlot.getChildren().add(jsonFormatBtn);
-            case FORM -> actionSlot.getChildren().add(formClearBtn);
-            case FORM_DATA -> actionSlot.getChildren().add(formDataClearBtn);
+            case FORM, FORM_DATA -> actionSlot.getChildren().addAll(formAddBtn, formClearBtn);
             case BINARY -> actionSlot.getChildren().addAll(binaryPickBtn, binaryClearBtn);
             default -> {
                 // XML / Text / 无：没有只属于这一种类型的动作，槽就空着
@@ -651,7 +737,7 @@ public final class SingleRequestPanel extends VBox {
                 yield inferred == HttpRequestSpec.BodyType.NONE
                         ? "Body" : "Body · 按 " + inferred.label();
             }
-            case FORM -> "Body · Form (" + formTable.entryCount() + " 项)";
+            case FORM -> "Body · Form (" + formDataTable.entryCount() + " 项)";
             case FORM_DATA -> {
                 int n = formDataTable.entryCount();
                 int files = formDataTable.fileCount();
@@ -811,7 +897,7 @@ public final class SingleRequestPanel extends VBox {
                 yield inferred == HttpRequestSpec.BodyType.NONE
                         ? "无请求体" : "按 " + inferred.label();
             }
-            case FORM -> "Form (" + formTable.entryCount() + " 项)";
+            case FORM -> "Form (" + formDataTable.entryCount() + " 项)";
             case FORM_DATA -> {
                 int n = formDataTable.entryCount();
                 int files = formDataTable.fileCount();
@@ -826,6 +912,21 @@ public final class SingleRequestPanel extends VBox {
 
     // ---------------------------------------------------------------- 发送
 
+    /** 把共用字段表里的文本段转成引擎要的键值对（Form 模式用）。 */
+    private List<Map.Entry<String, String>> formEntries() {
+        List<Map.Entry<String, String>> list = new java.util.ArrayList<>();
+        for (HttpRequestSpec.FormField field : formDataTable.fields()) {
+            if (field.isFile()) {
+                // Form 模式已隐藏「类型」列，正常到不了这里；
+                // 真出现（探针直接塞文件行）也不能把本地路径当值发出去。
+                continue;
+            }
+            list.add(new java.util.AbstractMap.SimpleEntry<>(
+                    field.name, field.text == null ? "" : field.text));
+        }
+        return list;
+    }
+
     /** 组装当前界面上的请求描述。 */
     public HttpRequestSpec currentSpec() {
         HttpRequestSpec.BodyType declared = declaredType();
@@ -836,8 +937,10 @@ public final class SingleRequestPanel extends VBox {
             case FORM, FORM_DATA, BINARY -> "";
             default -> bodyArea.getText();
         };
+        // Form 与 Form-data 共用一张表，但引擎要的是两种不同的模型：
+        // Form 收键值对（引擎负责百分号编码），Form-data 收逐段模型。
         List<Map.Entry<String, String>> formFields = effective == HttpRequestSpec.BodyType.FORM
-                ? formTable.entries() : List.of();
+                ? formEntries() : List.of();
         List<HttpRequestSpec.FormField> formData = effective == HttpRequestSpec.BodyType.FORM_DATA
                 ? formDataTable.fields() : List.of();
 
@@ -1229,7 +1332,7 @@ public final class SingleRequestPanel extends VBox {
      * 这个结果状态，不是点击过程的副作用。
      */
     void selectBodyTypeForTest(HttpRequestSpec.BodyType type) {
-        selectBodyType(type, false);
+        selectBodyType(type);
     }
 
     /** 测试用：当前选中的请求体类型。 */
@@ -1257,14 +1360,29 @@ public final class SingleRequestPanel extends VBox {
         return editorHolder;
     }
 
-    /** 测试用：Form 键值表。 */
-    KeyValueTable formTableForTest() {
-        return formTable;
-    }
-
-    /** 测试用：Form-data 表。 */
+    /** 测试用：Form / Form-data 共用的字段表。 */
     FormDataTable formDataTableForTest() {
         return formDataTable;
+    }
+
+    /** 测试用：点一下「+ Token」（探针跑在无头环境，点不到真实按钮）。 */
+    void clickAddTokenForTest() {
+        tokenHeader.fire();
+    }
+
+    /** 测试用：「+ Token」按钮是否存在（无头环境断言不了点击，但断得到存在与文案）。 */
+    Button tokenButtonForTest() {
+        return tokenHeader;
+    }
+
+    /** 测试用：请求头键值表（「+ JSON」「+ 新增请求头」都作用在它上面）。 */
+    KeyValueTable headersTableForTest() {
+        return headersTable;
+    }
+
+    /** 测试用：query 参数键值表。 */
+    KeyValueTable paramsTableForTest() {
+        return paramsTable;
     }
 
     /** 测试用：工具行右侧的状态位与守卫文字。 */
@@ -1329,7 +1447,7 @@ public final class SingleRequestPanel extends VBox {
 
     /** 测试用：往 Form 键值表里塞一行。 */
     void addFormFieldForTest(String key, String value) {
-        formTable.setEntries(Map.of(key, value));
+        formDataTable.setTextFieldsForTest(key, value);
     }
 
     /** 测试用：设置请求头表。 */

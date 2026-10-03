@@ -196,33 +196,13 @@ public class QrModule implements ToolModule {
                 new Tab("解析二维码", buildDecodeTab()),
                 new Tab("生成二维码", buildGenerateTab()));
 
-        // 动作行与页签同一行：TabPane 的 Tab 头由 skin 内部生成，塞不进外来节点，
-        // 所以只能把它们并排放在同一个 HBox 里，让动作行靠右收尾。
-        //
-        // 【宽度分配是这里最容易错的地方】
-        // TabPane 若吃掉全部剩余宽度（Hgrow=ALWAYS + maxWidth=MAX_VALUE），
-        // 它会先把宽度抢光，动作行只分到最小宽度 → 按钮被压成「选…」「粘贴剪贴板 …」。
-        // 正确顺序是：让动作行**先按内容定宽**（不受挤压），TabPane 再吃剩下的。
-        // 所以 TabPane 横向只占「Tab 头需要多少」，剩余空间交给中间的弹性空格。
         qrTabs.setMaxHeight(Double.MAX_VALUE);
-        // 让 TabPane 吃掉剩余宽度：desig 上它就是「页签条 + 空白」的容器，
-        // 动作行贴右缘靠它撑开；但必须先保证动作行不被压缩（见下方 setMinWidth）。
         qrTabs.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(qrTabs, Priority.ALWAYS);
-        // 【这里不能给 tabRow 设 Vgrow=ALWAYS】页签行只有「Tab 头那么高」，
-        // 一旦让它纵向铺满，HBox 会拉高到整页高度，动作行被 CENTER_LEFT
-        // 摆到页面垂直中部 —— 看起来像飘在内容区右下角，离页签十万八千里。
-        // 需要铺满的是 TabPane 的**内容区**，那由 qrTabs 自己按 VGrow 处理。
         HBox tabRow = new HBox(qrTabs, decodeActions);
         tabRow.getStyleClass().add("qr-tabrow");
-        // 顶端对齐：动作行要贴的是**页签头**那一带（顶部 48px），
-        // 不是整个页签行（它纵向铺满整页高）。用 CENTER_LEFT 会在页面
-        // 垂直中部出现 —— 动作按钮飘在内容区右下方，离页签很远。
         tabRow.setAlignment(Pos.TOP_LEFT);
         VBox.setVgrow(tabRow, Priority.ALWAYS);
-        // 【关键】动作行永不参与宽度压缩：min == pref，HBox 分不到足够宽度时
-        // 宁可把 TabPane 压窄，也不能把动作按钮截成「选…」。
-        // 只设 Hgrow 不设这个，TabPane 会先抢光宽度，按钮就被省略号吃掉。
         decodeActions.setMinWidth(Region.USE_PREF_SIZE);
         HBox.setHgrow(decodeActions, Priority.NEVER);
 
@@ -278,21 +258,6 @@ public class QrModule implements ToolModule {
         selectionRect.setVisible(false);
         selectionRect.setMouseTransparent(true);
 
-        // 【必须用 Pane，不能换成 StackPane】框选层是「绝对定位画布」，
-        // 它的子节点不能被父容器摆放。
-        //
-        // 【历史 bug】这里原先是 StackPane + TOP_LEFT 对齐，结果框选矩形
-        // 永远从图片左上角顶点画出来，不跟随鼠标落点。原因是布局期
-        // Region.position() 会对每个子节点调用 child.relocate(x, y)，而
-        //      Node.relocate(x, y) 的实现是 layoutX = x - layoutBounds.getMinX()
-        // 关键在于 Shape 的 layoutBounds 起点就是它**自己的 x/y**：
-        // 矩形 setX(180) 后 minX 也是 180，于是 layoutX 被置成 -180，
-        // 渲染位置 = layoutX + x = 0 —— x/y 被完整抵消，只剩宽高在变，
-        // 所以无论从图片哪里开始拖，框都从左上角长出来。
-        // （同时 cropFromSelection() 读的是矩形属性 x/y，值是对的 ——
-        //  这正是「显示错、裁切对」这种迷惑现象的来源，别再被它带偏。）
-        // Pane 不重写 Parent.layoutChildren()（空实现），不会碰子节点位置，
-        // 子节点的 layoutX/layoutY 默认 0，矩形的 x/y 才能如实生效。
         selectionLayer = new Pane(decodePreview, selectionRect);
         selectionLayer.getStyleClass().add("selection-layer");
         selectionLayer.setPickOnBounds(false);
@@ -310,6 +275,7 @@ public class QrModule implements ToolModule {
         decodeStage.getStyleClass().addAll("image-preview-holder", "drop-zone");
         decodeStage.setMinHeight(320);
         decodeStage.setAlignment(Pos.CENTER);
+
         // 列宽一变（首次布局落定 / 用户拖了分隔条 / 窗口缩放），
         // 预览图与框选层的尺寸必须跟着重算，否则声明尺寸与渲染尺寸分叉，
         // 框选坐标就对不上。见 refreshPreviewSizing()。
@@ -320,26 +286,16 @@ public class QrModule implements ToolModule {
         installPasteShortcut();
         installSelectionDrag();
 
-        // ---------- 输入按钮（批注 A：搬到页签行右端）----------
-        // 选图/粘贴都只是取输入。解析在本页是「载入即自动识别」，
-        // 没有需要用户按下的提交动作，因此这一屏不设主色实底。
-        //
-        // 这一行原先是 leftBox 的第一个孩子，挤在预览框上方；搬到页签行右端后
-        // 左栏腾出的高度全归预览框（设计稿实测 +72px），代价是它成了页签行的
-        // 兄弟节点、需要手工跟随显隐（见 installDecodeActionsVisibility）。
-        Button openBtn = UiKit.secondaryButton("选择图片…");
+        Button openBtn = UiKit.secondaryButton("选择图片");
         openBtn.setOnAction(e -> chooseDecodeFile());
 
-        Button pasteBtn = UiKit.secondaryButton("粘贴剪贴板 (Ctrl+V)");
+        Button pasteBtn = UiKit.secondaryButton("粘贴剪贴板");
         pasteBtn.setOnAction(e -> pasteFromClipboard());
 
         decodeClearSelBtn = UiKit.secondaryButton("清除框选");
         decodeClearSelBtn.setDisable(true);
         decodeClearSelBtn.setOnAction(e -> clearSelection());
 
-        // 批注 C：「清空」改名「移除图片」，语义是「清图片」（连同结果回空态），
-        // 所以它和上面三个「取输入」动作同类，排在第四个；与前三个之间用一条
-        // 1px 竖线分组 —— 前三者改的是「怎么取输入」，它改的是「丢弃已有输入」。
         removeImgBtn = UiKit.quietButton("移除图片");
         removeImgBtn.setGraphic(Icons.of("trash", 14, "icon-muted"));
         removeImgBtn.setGraphicTextGap(6);

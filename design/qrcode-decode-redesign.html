@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>二维码 · 解析页重排评审 v1 · ToolNest</title>
+<style>
+/* ============================================================
+   设计令牌 —— 与 src/main/resources/css/app.css 的 .root 逐条对应。
+   必须定义在 :root（不是画布类上）：后加的区块一旦落在画布类作用域之外，
+   var() 会解析为空，描边与滚动条会静默消失。
+   ============================================================ */
+:root{
+  --dt-canvas:#f2f4f7; --dt-content-bg:#f8f9fb; --dt-surface:#ffffff;
+  --dt-surface-alt:#fafbfc; --dt-surface-sunken:#f2f4f7; --dt-surface-hover:#e8ecf2;
+  --dt-border:#e6eaef; --dt-border-faint:#f0f3f7; --dt-border-strong:#d2d7de;
+  --dt-text:#16181d; --dt-text-muted:#5a6169; --dt-text-subtle:#8b929c; --dt-text-invert:#ffffff;
+  --dt-accent:#2563eb; --dt-accent-hover:#1d4fd7; --dt-accent-pressed:#1843bd;
+  --dt-accent-soft:#eaf0fe; --dt-accent-border:#b8cdfb;
+  --dt-success:#167a4a; --dt-warning:#a1590a; --dt-danger:#c33333;
+  --dt-danger-soft:#fdf1f1; --dt-warning-soft:#fdf6ec; --dt-danger-border:#f0c4c4;
+  --dt-segmented-track:#eef1f5; --dt-segmented-thumb:#ffffff; --dt-segmented-edge:#dfe4ea;
+  --dt-neutral-chip:#e7eaef; --dt-row-alt:#fcfcfd; --dt-row-hover:#f5f7fa;
+  --dt-selection:#cfe0fd; --dt-scrollbar:#b3bac4; --dt-scrollbar-hover:#8b929c;
+  --ui:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI","PingFang SC",sans-serif;
+  --mono:"Cascadia Mono","Consolas","Microsoft YaHei UI",monospace;
+}
+
+/* ============================================================
+   评审页本体
+   ============================================================ */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:#eceff3;font-family:var(--ui);font-size:13px;line-height:1.6;color:var(--dt-text)}
+.doc{max-width:1800px;margin:0 auto;padding:30px 26px 110px}
+h1{font-size:24px;font-weight:700;margin:0 0 8px}
+h2{font-size:17px;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:9px}
+h2 .idx{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--dt-accent);
+        background:var(--dt-accent-soft);border-radius:6px;padding:2px 7px}
+h3{font-size:14px;font-weight:700;margin:22px 0 10px;color:var(--dt-text)}
+h3.sub{font-size:13px;font-weight:700;margin:20px 0 8px;color:var(--dt-text-muted)}
+p{margin:0 0 10px}
+.lead{font-size:13.5px;color:var(--dt-text-muted);max-width:1220px}
+.block{background:#fff;border:1px solid var(--dt-border);border-radius:12px;
+       padding:22px 24px;margin:0 0 18px}
+.hr{height:1px;background:var(--dt-border-faint);margin:18px 0}
+code,.mono{font-family:var(--mono);font-size:12px}
+code{background:var(--dt-surface-sunken);border-radius:4px;padding:1px 5px}
+b.warn{color:var(--dt-warning)}
+b.bad{color:var(--dt-danger)}
+b.good{color:var(--dt-success)}
+.small{font-size:12px;color:var(--dt-text-muted)}
+.tiny{font-size:11.5px;color:var(--dt-text-subtle)}
+
+table.t{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 4px}
+table.t th{background:var(--dt-surface-alt);color:var(--dt-text-subtle);font-size:11px;
+           font-weight:700;text-align:left;padding:8px 10px;border-bottom:1px solid var(--dt-border)}
+table.t td{padding:7px 10px;border-bottom:1px solid var(--dt-border-faint);vertical-align:top}
+table.t tr:nth-child(even) td{background:var(--dt-row-alt)}
+table.t td.n{font-family:var(--mono);white-space:nowrap}
+table.t .ok{color:var(--dt-success);font-weight:700}
+table.t .no{color:var(--dt-danger);font-weight:700}
+table.t tr.total td{background:#f4f7fd;font-weight:700;color:var(--dt-text)}
+.gt{width:100%;border-collapse:collapse;font-size:12.5px}
+.gt th{background:var(--dt-surface-alt);color:var(--dt-text-subtle);font-size:11px;
+       font-weight:700;text-align:left;padding:6px 9px;border-bottom:1px solid var(--dt-border)}
+.gt td{padding:5px 9px;border-bottom:1px solid var(--dt-border-faint);vertical-align:top}
+.gt td.n{font-family:var(--mono);text-align:right;white-space:nowrap;font-weight:700}
+.gt tr.total td{background:#f4f7fd;font-weight:700;color:var(--dt-text)}
+.gt td.em{color:var(--dt-accent);font-weight:700}
+.pass{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px}
+.pass.g{background:#eaf6ef;color:var(--dt-success)}
+.pass.r{background:var(--dt-danger-soft);color:var(--dt-danger)}
+.pass.y{background:var(--dt-warning-soft);color:var(--dt-warning)}
+.tag{display:inline-flex;align-items:center;justify-content:center;background:var(--dt-accent);
+     color:#fff;border-radius:999px;padding:1px 7px;font-family:var(--mono);font-size:10.5px;
+     font-weight:700;margin-left:6px}
+
+.ic{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6px;
+    stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
+.ic-16{width:16px;height:16px}
+.ic-12{width:12px;height:12px}
+
+/* ============================================================
+   1:1 画布 —— 1266 × 763（窗口真实尺寸）
+   右侧标尺与画布共用同一套 grid-template-rows，刻度才能严格对齐。
+   ============================================================ */
+.stage{display:flex;align-items:flex-start;margin:10px 0 6px}
+.win{position:relative;flex:none;width:1266px;height:763px;background:var(--dt-content-bg);
+     overflow:hidden;outline:1px solid var(--dt-border);
+     font-family:var(--ui);font-size:13px;line-height:1.45;color:var(--dt-text)}
+.ruler{flex:none;width:300px;margin-left:16px;display:grid}
+.ruler>div{position:relative;border-top:1px solid var(--dt-segmented-edge);
+           font-size:11px;color:var(--dt-text-subtle);padding:1px 0 0 9px;overflow:hidden}
+.ruler>div.gap{border-top:1px dashed #e6eaef;color:#b3bac4}
+.ruler .h{font-family:var(--mono);font-weight:700;color:var(--dt-text-muted);font-size:11px}
+.ruler .note{color:var(--dt-text-subtle);display:block;line-height:1.35}
+.ruler .key{color:var(--dt-accent)}
+.ruler .tg{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;
+           background:var(--dt-accent);color:#fff;border-radius:999px;padding:0 5px;
+           font-family:var(--mono);font-size:10.5px;font-weight:700;margin-right:4px}
+.ruler .an{display:block;color:#3c424a;font-size:11px;line-height:1.45;margin-top:3px}
+.ruler .an.q{color:var(--dt-warning)}
+
+/* 左侧栏固定 267（与真实 SplitPane 0.21 一致），内容区 984.7 → 用 985 近似、
+   余下 14.3 记作滚动条与分隔条，预算表按实测值写。
+   .main 是**纵向流式**的三段：页头 86 / 页签+动作 48 / 工作区 613（+16 上留白）。
+   不要用绝对定位分段 —— 那样纵向加总校验会失效，而加总正是本稿的核心 artefact。 */
+.main{position:absolute;left:267px;top:0;width:999px;padding:0 24px;
+      display:flex;flex-direction:column;height:763px}
+.pad{padding:0 24px}
+
+/* ---- 侧边栏（上下文，非本轮改动） ---- */
+.sb{position:absolute;left:0;top:0;width:267px;height:763px;background:var(--dt-canvas);
+    border-right:1px solid var(--dt-border);padding:16px 12px}
+.sb-brand{display:flex;align-items:center;gap:9px;padding:2px 6px 16px}
+.sb-logo{width:28px;height:28px;border-radius:9px;background:var(--dt-accent);
+         display:flex;align-items:center;justify-content:center;color:#fff}
+.sb-name{font-size:16px;font-weight:700;line-height:1.2}
+.sb-sub{font-size:11px;color:var(--dt-text-subtle);line-height:1.2}
+.sb-all{height:34px;border-radius:6px;display:flex;align-items:center;gap:8px;
+        padding:0 8px;font-size:13px}
+.sb-all.on{background:var(--dt-accent-soft);box-shadow:inset 3px 0 0 var(--dt-accent);color:var(--dt-accent);font-weight:700}
+.sb-all .cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--dt-text-subtle)}
+.sb-search{height:36px;border-radius:8px;background:var(--dt-surface);
+           border:1px solid var(--dt-segmented-edge);margin:10px 0 16px;
+           display:flex;align-items:center;gap:8px;padding:0 10px;color:var(--dt-text-subtle);font-size:12.5px}
+.sb-cap{font-size:11px;color:var(--dt-text-subtle);font-weight:700;padding:0 8px 6px}
+.sb-item{height:32px;border-radius:6px;display:flex;align-items:center;gap:8px;
+         padding:0 8px;font-size:13px;color:var(--dt-text)}
+.sb-group{display:flex;flex-direction:column}
+.sb-grow{max-height:600px;overflow:hidden}
+.sb-item.leaf{padding-left:26px;font-size:12.5px;color:var(--dt-text-muted)}
+.sb-item .cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--dt-text-subtle)}
+
+/* ---- 详情页头 86（外壳，本轮不动） ---- */
+.pgh{background:var(--dt-surface);border-bottom:1px solid var(--dt-border);padding:16px 24px 14px;height:86px}
+.pgh-row{display:flex;align-items:center;gap:12px;height:32px}
+.pgh-back{height:30px;border-radius:7px;border:1px solid var(--dt-border-strong);
+          background:var(--dt-surface);display:flex;align-items:center;gap:6px;
+          padding:0 10px;font-size:12.5px;color:var(--dt-text-muted)}
+.pgh-title{font-size:23px;font-weight:700;letter-spacing:0}
+.pgh-crumb{font-size:12.5px;color:var(--dt-text-muted);margin-top:5px}
+
+/* ---- 外层胶囊页签行 48（Tab 头 38 + 下留白 10） ---- */
+/* 上留白 16 = .module-body 的上留白，包含在页签行这一段的 box 里，
+   这样 .main 的三个流式子节点高度就是 86 / 64 / 613，加总 763。 */
+.bizrow{display:flex;align-items:center;height:64px;padding-top:16px;box-sizing:border-box}
+.seg{height:38px;background:var(--dt-segmented-track);border:1px solid var(--dt-segmented-edge);
+     border-radius:9px;padding:3px;display:flex;gap:2px;flex:none}
+.seg>span{height:32px;border-radius:7px;padding:0 14px;display:flex;align-items:center;
+          font-size:13.5px;color:var(--dt-text-muted)}
+.seg>span.on{background:var(--dt-segmented-thumb);font-weight:700;color:var(--dt-text);
+             box-shadow:0 1px 2px rgba(22,24,29,.06)}
+
+/* ---- 动作行 32（本轮新位置：页签行右端，与页签同排） ---- */
+.actrow{display:flex;align-items:center;gap:8px;flex:1 1 auto;justify-content:flex-end;
+        padding-left:16px;min-width:0}
+.btn{height:32px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;
+     padding:0 12px;font-size:13px;border:1px solid var(--dt-border-strong);
+     background:var(--dt-surface);color:var(--dt-text);white-space:nowrap}
+.btn.quiet{border:none;background:transparent;color:var(--dt-accent);padding:0 8px}
+.btn.primary{background:var(--dt-accent);border-color:var(--dt-accent);color:#fff;font-weight:700}
+.btn.dis{color:var(--dt-text-subtle);border-color:var(--dt-border);background:var(--dt-surface-alt)}
+.btn.sm{height:28px;border-radius:7px;font-size:12.5px;padding:0 9px}
+.spacer{flex:1 1 auto;min-width:8px}
+/* 动作组之间的竖线：左边三个是「取输入」，右边「移除图片」属「丢弃」，
+   间隔 1px 细线把两组的语义分开，避免 4 个按钮糊成一排。 */
+.actsep{width:1px;height:18px;background:var(--dt-border-strong);flex:none;margin:0 3px}
+
+/* ---- 解析页主体：左预览 / 右结果，两栏由 SplitPane 分隔 ---- */
+.split{flex:1 1 auto;min-height:0;display:flex;align-items:stretch}
+.divider{width:7px;flex:none;background:var(--dt-content-bg);position:relative}
+.divider>i{position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--dt-border)}
+
+/* 左栏：预览区（含虚线上限 480 见方） */
+.leftcol{width:480px;flex:none;display:flex;flex-direction:column;gap:8px}
+/* 预览框：有图时上限 492 高，容器按可用高铺满 */
+.stage-holder{flex:1 1 auto;min-height:0;background:var(--dt-surface);
+              border:1px solid var(--dt-border);border-radius:9px;
+              display:flex;align-items:center;justify-content:center;position:relative}
+.stage-holder.drop{background:var(--dt-surface-alt);border:1.5px dashed var(--dt-segmented-edge)}
+.meta{font-size:12px;color:var(--dt-text-muted);height:16px;line-height:16px}
+.hint{font-size:12px;color:var(--dt-text-subtle);height:16px;line-height:16px}
+
+/* 右栏：结果区 */
+.rightcol{width:449px;flex:none;display:flex;flex-direction:column;min-width:0}
+.rhead{height:32px;display:flex;align-items:center;gap:8px;flex:none}
+.rhead .rt{font-size:13px;font-weight:700}
+.rhead .cnt{font-family:var(--mono);font-size:12px;color:var(--dt-text-muted);
+            background:var(--dt-neutral-chip);border-radius:999px;padding:1px 8px}
+.rhead .rmeta{font-size:12px;color:var(--dt-text-subtle)}
+/* 结果列表容器＝一张白卡（含内层滚动） */
+.rbox{flex:1 1 auto;min-height:0;background:transparent;display:flex;flex-direction:column;gap:10px}
+.rcard{background:var(--dt-surface);border:1px solid var(--dt-border);border-radius:9px;
+       padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+/* 卡片实测高 74.75px = 内边距 10×2 + 头行 28 + 间距 6 + 正文 1 行 18.75 + 边框 2。
+   头行是 28 而不是 24：它被里面的 28px 紧凑档按钮撑起来了（这是对的，
+   让头行去决定动作按钮的高度反而会失控）。 */
+.rcard.sel{border-color:var(--dt-accent-border);box-shadow:0 0 0 2px var(--dt-accent-soft)}
+.rchead{display:flex;align-items:center;gap:8px}
+.rnum{font-size:12px;font-weight:700;color:var(--dt-text-muted);font-family:var(--mono)}
+.rfmt{font-family:var(--mono);font-size:10.5px;color:var(--dt-accent);
+      background:var(--dt-accent-soft);border-radius:5px;padding:2px 7px}
+/* 行尾动作：复制 / 在浏览器打开（本轮从底部按钮行下移到这里） */
+.ract{display:flex;align-items:center;gap:2px;margin-left:auto}
+.rtext{font-family:var(--mono);font-size:12.5px;color:var(--dt-text);word-break:break-all;
+       line-height:1.5}
+.rtext.url{color:var(--dt-accent)}
+/* 结果区空态 */
+.rempty{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;
+        justify-content:center;gap:7px;text-align:center;color:var(--dt-text-subtle)}
+.rempty .et{font-size:13px;color:var(--dt-text-muted)}
+.rempty .eh{font-size:12px;color:var(--dt-text-subtle)}
+
+/* 注释条 28（本轮新删：改造前底部那条按钮行下面的提示位） */
+.notice{display:flex;align-items:flex-start;gap:8px;padding:6px 10px;border-radius:8px;
+        background:var(--dt-warning-soft);border-left:3px solid var(--dt-warning);font-size:12px;
+        color:var(--dt-text-muted)}
+
+/* 滚动条（显式可见，浅底上必须能被发现） */
+.scrollv{position:absolute;top:0;bottom:0;width:11px}
+.scrollv i{position:absolute;left:4px;width:4px;border-radius:3px;background:var(--dt-scrollbar)}
+
+/* ---- 标注 chip（只出现在画布内侧空白处，不遮挡内容） ---- */
+.anno{position:absolute;display:inline-flex;align-items:center;gap:5px;height:22px;
+      border-radius:999px;padding:0 9px;font-size:11px;font-weight:700;
+      background:var(--dt-accent);color:#fff;box-shadow:0 2px 8px rgba(22,24,29,.18);
+      white-space:nowrap;z-index:5}
+.anno.red{background:#d0342c}
+.anno.gray{background:#5a6169}
+.anno.green{background:#167a4a}
+.anno .num{background:rgba(255,255,255,.24);border-radius:999px;padding:0 5px;font-family:var(--mono)}
+
+/* ---- 组件细节（放大 4×） ---- */
+.zoom{background:#fff;border:1px dashed var(--dt-border-strong);border-radius:10px;
+      padding:16px 14px 26px;overflow-x:auto}
+.z4{zoom:4}
+.z3{zoom:3}
+.z4 .seg,.z4 .actrow,.z4 .rcard,.z4 .rhead{width:449px;padding-left:0!important;padding-right:0!important}
+.callouts{display:flex;gap:22px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--dt-text-muted)}
+.callouts div{display:flex;align-items:center;gap:6px}
+.mk{font-family:var(--mono);font-weight:700;color:var(--dt-accent)}
+.skl-row{display:flex;gap:18px;flex-wrap:wrap}
+.skl{flex:1 1 340px;border:1px solid var(--dt-border);border-radius:10px;overflow:hidden}
+.skl-h{background:var(--dt-surface-alt);border-bottom:1px solid var(--dt-border);
+       padding:7px 10px;font-size:12px;font-weight:700;display:flex;align-items:center}
+.legend{padding:6px 10px;font-size:11.5px;color:var(--dt-text-subtle);border-top:1px solid var(--dt-border-faint)}
+
+/* ---- 骨架图 ---- */
+.sk-box{border:1px solid var(--dt-border-strong);border-radius:6px;background:var(--dt-surface-alt);
+        display:flex;align-items:center;padding:0 8px;font-size:11.5px;color:var(--dt-text-muted);
+        position:relative;overflow:hidden}
+.sk-box.hi{background:var(--dt-accent-soft);border-color:var(--dt-accent-border);color:var(--dt-accent);font-weight:700}
+.sk-box.del{background:var(--dt-danger-soft);border-color:var(--dt-danger-border);
+            color:var(--dt-danger);text-decoration:line-through}
+.sk-box.add{background:#eaf6ef;border-color:#a9d8bd;color:var(--dt-success);font-weight:700}
+.sk-col{display:flex;flex-direction:column;gap:5px;padding:10px}
+
+/* ---- 问题卡 ---- */
+.q{border:1px solid var(--dt-border);border-left:3px solid var(--dt-accent);border-radius:8px;
+   padding:12px 14px;margin:0 0 12px;background:var(--dt-surface-alt)}
+.q .qh{font-weight:700;font-size:13px;margin-bottom:4px}
+.q ul{margin:6px 0 6px 18px;padding:0}
+.q li{margin:3px 0;font-size:12.5px}
+.q.qw{border-left-color:var(--dt-warning)}
+.q.qd{border-left-color:var(--dt-danger)}
+.foot{margin-top:26px;font-size:12px;color:var(--dt-text-subtle);text-align:center}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13.5 12 18.5l9-5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.2"/><path d="M20 20l-4.2-4.2"/></symbol>
+    <symbol id="i-aleft" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M17 20h3M14 20h.02"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.4l2 2.4h7.6a2 2 0 0 1 2 2v8.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-11Z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7.5"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 2.6 20h18.8L12 4Z"/><path d="M12 10v4.4M12 17.4v.2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.4M12 7.6v.2"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l4.5-4.5 3.5 3.5 3-2.5 4.5 4"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><rect x="6" y="4.5" width="12" height="16" rx="2"/><path d="M9.5 4.5V3.5h5v1"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6.5 3.5v14h14"/><path d="M3.5 6.5h14v14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9 7V5h6v2M6.5 7l1 13h9l1-13"/></symbol>
+  </defs>
+</svg>
+
+<div class="doc">
+
+<h1>二维码 · 解析页重排评审 v1</h1>
+<p class="lead">范围：<code>features/qrcode/QrModule</code> 的「解析二维码」页签
+（<code>buildDecodeTab()</code> 及其 <code>renderDecodeResults()</code> /
+<code>resultCard()</code> 两条渲染路径）。<b>生成二维码页签不在本轮范围</b>，
+外壳（<code>ContentPane</code> / <code>MainWindow</code>）也不动。
+本页只出设计稿，不改任何产品代码。</p>
+
+<div class="block">
+<h2><span class="idx">01</span>审阅信息</h2>
+<table class="t">
+<tbody>
+<tr><td style="width:150px"><b>状态</b></td><td><span class="pass y">待审核 v1</span></td></tr>
+<tr><td><b>画布口径</b></td><td>真实窗口 <b>1266 × 763</b>（1:1），侧边栏 267 + 主区 999。
+    内容区实测宽 <b>984.7</b>（<code>SplitPane</code> 0.21 分隔条 6.7 后）。</td></tr>
+<tr><td><b>依赖</b></td><td>单文件、零外部资源、无网络字体、无 emoji。图标为内联手写 SVG（24 网格，与 <code>ui/Icons.java</code> 同族）。</td></tr>
+<tr><td><b>改造前基线</b></td><td>本轮所有「改造前」数字均来自<b>真实渲染实测</b>（1266×763 窗口下逐节点 <code>localToScene</code> 取 <code>boundsInLocal</code>），
+    不是从源码推算。测量脚本见 §09。</td></tr>
+<tr><td><b>本轮动了什么</b></td><td>① 动作按钮行<b>上移</b>到页签行右端并排；② 底部按钮行<b>删除</b>，复制 / 浏览器入口<b>下移</b>到每条结果卡片；
+    ③ 左下角「清空」按钮<b>删除</b>，改名「移除图片」并接到页签行右端第 4 位（与「取输入」动作分属「对图操作」一类）。</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">02</span>你的批注 → 逐条落法</h2>
+<p class="lead">红笔批注共三处。<b>注意第 ① 与第 ③ 条在图上是一根交叉的箭头</b> ——
+箭头起点在「复制结果 / 在浏览器打开」，终点标在「清空」的位置，两条线交叉只表示
+「这两处互换位置」，不是四个动作的搬家。</p>
+
+<table class="t">
+<thead><tr><th style="width:56px">批注</th><th style="width:250px">图上画的是</th><th>我怎么理解</th><th style="width:96px">是否已含在方案里</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="tag">A</span></td>
+  <td>从左栏动作行（选择图片… / 粘贴剪贴板 / 清除框选）画一根箭头到页签行右端，标注「调整到这儿」</td>
+  <td>把三个取输入动作从「左栏上方独占一行」搬到「页签行的右端」，与「解析 / 生成」两个页签<b>同一行</b>。左栏因此让出 40px（32 动作行 + 8 间距）给预览图。</td>
+  <td><span class="pass g">是</span></td>
+</tr>
+<tr>
+  <td><span class="tag">B</span></td>
+  <td>底部「复制结果」「在浏览器打开」两个框画了箭头，并从该处引出线；框下方标「去掉」</td>
+  <td>底部按钮行整行删除。这两个动作<b>改挂到每条结果卡片内部</b>（卡片头右端），因为一个页面可能有多条结果，底部一个「复制结果」只能表达「全部」，与卡片列表的结构对不上。</td>
+  <td><span class="pass g">是</span></td>
+</tr>
+<tr>
+  <td><span class="tag">C</span></td>
+  <td>左下角「清空」按钮画框 + 箭头交叉指向它，右下角标「清空」</td>
+  <td>「清空」从按钮行里<b>去掉这个按钮</b>，改名「<b>移除图片</b>」接到<b>页签行右端第 4 位</b>。依据：它清的是<b>图</b>（连同结果回空态），与「选择图片／粘贴」同属「对图操作」一类；用 1px 竖线与前三个「取输入」动作分开。同时由 <code>dangerButton</code> 降为 <code>quietButton</code>，破坏性改由文案 + 图标 + 悬停提示三处承担。</td>
+  <td><span class="pass g">是</span></td>
+</tr>
+</tbody>
+</table>
+
+<div class="q qd" style="margin-top:14px">
+<div class="qh">批注 ③ 的歧义已由你拍板定案</div>
+「清空」清的是<b>图片</b>（连同结果一起回空态），形态为<b>图标 + 文字</b> ——
+因此它落在<b>页签行右端第 4 位</b>，而非结果区标题行。理由：清图与选图／粘贴同属「对图操作」；
+挂在结果区标题行反而会让人以为它只清结果、不动图。详见 §11-Q1（已定案）。</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">03</span>改造前的浪费在哪（实测）</h2>
+<p class="lead">下表的「高度」全部取自 1266×763 真实渲染的节点实测值。</p>
+
+<table class="t">
+<thead><tr><th style="width:44px">#</th><th>区段</th><th style="width:88px">实测高 px</th><th style="width:110px">实测 y</th><th>问题</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td>详情页页头（返回 + 23px 标题 + 面包屑）</td><td class="n">86.0</td><td class="n">0</td><td>外壳，本轮不动</td></tr>
+<tr><td class="n">2</td><td>外层胶囊页签头（<code>.qr-tabs</code> Tab 头，含下留白 10）</td><td class="n">48.7</td><td class="n">102.0</td><td>外壳形态，保留</td></tr>
+<tr><td class="n">3</td><td><b>左栏动作行（3 个按钮独占一行）</b></td><td class="n"><b>32.0</b></td><td class="n">168.7</td><td class="em"><b>一行只放取输入动作，右侧空着 ≈520px 死白</b></td></tr>
+<tr><td class="n">4</td><td>左栏预览框（含空态虚线）</td><td class="n">492.7</td><td class="n">210.7</td><td>被动作行挤掉 40px</td></tr>
+<tr><td class="n">5</td><td>左栏「等待载入」元信息行</td><td class="n">16.0</td><td class="n">711.3</td><td>—</td></tr>
+<tr><td class="n">6</td><td>左栏框选提示行</td><td class="n">16.0</td><td class="n">735.3</td><td>—</td></tr>
+<tr><td class="n">7</td><td>右栏结果滚动区（空态居中）</td><td class="n">574.0</td><td class="n">168.7</td><td>—</td></tr>
+<tr><td class="n">8</td><td><b>右栏底部按钮行（复制结果 / 在浏览器打开 / 清空）</b></td><td class="n"><b>32.0</b></td><td class="n">754.7</td><td class="em"><b>被批注 B 整行删除；且它是全页唯一出现破坏色按钮的位置</b></td></tr>
+<tr class="total"><td></td><td colspan="4">内容总高 <b>618.0</b>（SplitPane 实测高），视口 763 − 页头 86 − 页签 48.7 = <b>628.3</b>，余量 10.3 由 <code>.module-body</code> 上留白 16 吸收（内容底仅 640 高、需要 716.7，<b>已出现外层滚动条</b>）</td></tr>
+</tbody>
+</table>
+
+<div class="q qd" style="margin-top:14px">
+<div class="qh">根因一句话：底部按钮行没有和「结果可能有多个」这件事对齐</div>
+改造前把「复制 / 打开」做成了<b>页面级</b>的按钮行 —— 但本页的结果区结构上
+是<b>一码一卡</b>（<code>#1 #2 #3</code> 三张卡片，见 <code>qrlist</code> 探针守的正是「不丢数据」）。
+页面级的「复制结果」只能表达「复制全部」，用户想单独拿第 2 个码时就只能回列表里手动挑。
+把动作挂进卡片内部之后，「每个码各自可复制」第一次和「每个码都是一张卡」对齐了。
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">04</span>改造后 · 面积预算（加总 = 763）</h2>
+
+<div class="skl-row">
+<div class="skl" style="display:flex;flex-direction:column">
+<div class="skl-h">视口纵向分配<span class="tag" style="margin-left:auto">加总 763</span></div>
+<table class="gt" style="border:0">
+<thead><tr><th>#</th><th>区段</th><th>px</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td>详情页页头（不动）</td><td class="n">86</td></tr>
+<tr><td class="n">2</td><td>页签 + 动作 同行（Tab 头 38 + 下留白 10）</td><td class="n">48</td></tr>
+<tr><td class="n">3</td><td><code>.module-body</code> 上留白</td><td class="n">16</td></tr>
+<tr><td class="n">4</td><td><b>工作区</b>（左预览 / 右结果，SplitPane，占满剩余）</td><td class="n em">613</td></tr>
+<tr><td class="n">5</td><td>底部（<b>已删整行</b>，无占用）</td><td class="n">0</td></tr>
+<tr class="total"><td></td><td>合计</td><td class="n">763</td></tr>
+</tbody>
+</table>
+<div class="legend">工作区 613 = 763 − 86 − 48 − 16。与改造前实测内容高 618 相比，左侧预览可见高由 492.7 → <b>565</b>（+72）。</div>
+</div>
+
+<div class="skl" style="display:flex;flex-direction:column">
+<div class="skl-h">左栏内部预算<span class="tag" style="margin-left:auto">加总 613</span></div>
+<table class="gt" style="border:0">
+<thead><tr><th>#</th><th>区段</th><th>px</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td>~~动作行（已上移到页签行）~~</td><td class="n"><s>32</s></td></tr>
+<tr><td class="n">2</td><td>~~与动作行的间距~~</td><td class="n"><s>8</s></td></tr>
+<tr><td class="n">3</td><td>预览框 <code>.image-preview-holder</code>（<b>吃掉剩余</b>）</td><td class="n em">565</td></tr>
+<tr><td class="n">4</td><td>元信息行（<code>decodeMeta</code>）</td><td class="n">16</td></tr>
+<tr><td class="n">5</td><td>间距</td><td class="n">8</td></tr>
+<tr><td class="n">6</td><td>框选提示行</td><td class="n">16</td></tr>
+<tr><td class="n">7</td><td>底部留白</td><td class="n">10</td></tr>
+<tr class="total"><td></td><td>合计</td><td class="n">613</td></tr>
+</tbody>
+</table>
+<div class="legend">预览框 565 是弹性的（<code>VGrow</code>），所以加总随视口高变化，565 是 763 窗口下的解。</div>
+</div>
+
+<div class="skl" style="display:flex;flex-direction:column">
+<div class="skl-h">右栏内部预算<span class="tag" style="margin-left:auto">加总 613</span></div>
+<table class="gt" style="border:0">
+<thead><tr><th>#</th><th>区段</th><th>px</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td>结果区标题行（「识别结果」+ 计数 + 只读汇总，<b>无动作</b>）</td><td class="n">32</td></tr>
+<tr><td class="n">2</td><td>间距</td><td class="n">8</td></tr>
+<tr><td class="n">3</td><td>结果卡片列表（内层滚动，<code>VGrow</code>）</td><td class="n em">573</td></tr>
+<tr><td class="n">4</td><td><b>底部按钮行（已删）</b></td><td class="n"><s>32</s></td></tr>
+<tr><td class="n">5</td><td><b>底部提示条（已删按钮行后不再需要）</b></td><td class="n"><s>28</s></td></tr>
+<tr class="total"><td></td><td>合计</td><td class="n">613</td></tr>
+</tbody>
+</table>
+<div class="legend">卡片实测高 <b>74.75</b>（内边距 10×2 + 头行 28 + 间距 6 + 正文 1 行 18.75 + 边框 2）。
+列表容器 <b>573</b> 高，6 张整卡占 6×74.75 + 5×10 = <b>498.5</b>，底部留 <b>74.5px</b> 空白 ——
+<b>Q2 定案：只展示 6 张整，不露半截卡</b>；第 7 张起由内层滚动条承接（滚动条全程可用）。
+改造前 574 高里卡片同样 74.75 高，但底部按钮行占 32 + 间距 12，净可用 <b>530</b>，同样是 6 张整。</div>
+</div>
+</div>
+
+<div class="notice" style="margin-top:14px">
+<svg class="ic ic-12"><use href="#i-warn"/></svg>
+<span><b>诚实的说明（本轮数字修正过两次）</b>：v1 稿里把卡片高写成 88px（错以为头行 24、正文 2 行），
+实际渲染是 <b>74.75px</b>（头行被 28px 按钮撑到 28、网址在 423px 内宽下只占 1 行）。
+改对之后发现：<b>结果区完整卡数改造前后都是 6 张，没有增加</b> ——
+早前版本靠「第 7 张露半截」制造「多出半张」的观感，按 Q2 定案已改为<b>只展示 6 张整 + 内层滚动</b>，
+不再用裁切卡表达「还有更多」。
+本轮真正可量化的收益是<b>左栏预览 492.7 → 565（+72px）</b>。</span>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">05</span>骨架对比：改造前 → 改造后</h2>
+
+<div class="skl-row" style="margin-top:6px">
+<div class="skl">
+<div class="skl-h">改造前<span class="tag" style="margin-left:auto">内容实测 618</span></div>
+<div class="sk-col" style="height:300px">
+  <div class="sk-box" style="height:34px">详情页页头 86</div>
+  <div class="sk-box" style="height:22px">外层胶囊页签 48.7</div>
+  <div style="display:flex;gap:6px;height:210px">
+    <div style="flex:0 0 200px;display:flex;flex-direction:column;gap:5px">
+      <div class="sk-box del" style="height:20px">动作行 32（独占一行）</div>
+      <div class="sk-box hi" style="flex:1">预览框 492.7</div>
+      <div class="sk-box" style="height:14px">元信息 16</div>
+      <div class="sk-box" style="height:14px">提示 16</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+      <div class="sk-box hi" style="flex:1">结果滚动区 574</div>
+      <div class="sk-box del" style="height:20px">底部按钮行 32（复制/打开/清空）</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="skl">
+<div class="skl-h">改造后<span class="tag" style="margin-left:auto">内容 613</span></div>
+<div class="sk-col" style="height:300px">
+  <div class="sk-box" style="height:34px">详情页页头 86（不动）</div>
+  <div style="display:flex;gap:6px;height:22px">
+    <div class="sk-box" style="flex:0 0 130px">页签 38</div>
+    <div class="sk-box add" style="flex:1">动作行 32 上移 ← 批注 A</div>
+  </div>
+  <div style="display:flex;gap:6px;height:210px">
+    <div style="flex:0 0 200px;display:flex;flex-direction:column;gap:5px">
+      <div class="sk-box add" style="flex:1">预览框 565（+72）</div>
+      <div class="sk-box" style="height:14px">元信息 16</div>
+      <div class="sk-box" style="height:14px">提示 16</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+      <div class="sk-box add" style="height:20px">标题行 32（计数 + 汇总，无动作）</div>
+      <div class="sk-box hi" style="flex:1">结果卡片列表 573（6 张整 + 底留白，动作挂卡内）← 批注 B</div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<p class="small" style="margin-top:12px">
+<b>读法</b>：绿色 = 本轮新增/扩大；红色删除线 = 本轮删除；蓝色 = 保留但结构不变。
+左右两块的高度按同一比例绘制（骨架图非 1:1，仅表达比例关系；1:1 见 §06）。</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">06</span>图 1 · 解析页 · 结果态（1266 × 763 真实尺寸，1:1）</h2>
+<p class="small">状态：已粘贴一张含 3 个二维码的图，识别完成。<b>这张图是审阅的主体</b> ——
+批注 A / B / C 三处改动在这一屏里全部可见。</p>
+
+<div class="stage">
+<div class="win">
+  <!-- 侧边栏 -->
+  <div class="sb">
+    <div class="sb-brand">
+      <div class="sb-logo"><svg class="ic ic-16"><use href="#i-layers"/></svg></div>
+      <div><div class="sb-name">ToolNest</div><div class="sb-sub">工具巢</div></div>
+    </div>
+    <div class="sb-all on"><svg class="ic"><use href="#i-layers"/></svg>所有工具<span class="cnt">11</span></div>
+    <div class="sb-search"><svg class="ic"><use href="#i-search"/></svg>搜索功能…</div>
+    <div class="sb-cap">功能分类</div>
+    <div class="sb-grow">
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>转换类型工具<span class="cnt">2</span></div>
+      <div class="sb-item leaf">时间戳转换</div>
+      <div class="sb-item leaf">Cron 表达式解析</div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>编码/解码类型工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>格式化类型工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>生成类型工具<span class="cnt">2</span></div>
+      <div class="sb-item leaf">二维码</div>
+      <div class="sb-item leaf">UUID 生成</div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>文本处理类型工具<span class="cnt">2</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>网络请求工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>图片处理类型工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>文件处理类型工具<span class="cnt">1</span></div>
+    </div>
+  </div>
+
+  <!-- 主区 -->
+  <div class="main">
+    <div class="pgh">
+      <div class="pgh-row">
+        <div class="pgh-back"><svg class="ic-12"><use href="#i-aleft"/></svg>返回</div>
+        <div class="pgh-title">二维码</div>
+      </div>
+      <div class="pgh-crumb">生成类型工具 › 二维码</div>
+    </div>
+
+    <div class="bizrow">
+      <!-- ── 页签 + 动作 同行 48 ── -->
+      <div class="seg"><span class="on">解析二维码</span><span>生成二维码</span></div>
+      <!-- 批注 A：三个取输入动作搬到这里；批注 C：清空（=移除图片）紧随其后，同属「图」的动作 -->
+      <div class="actrow">
+        <div class="btn"><svg class="ic"><use href="#i-image"/></svg>选择图片…</div>
+        <div class="btn"><svg class="ic"><use href="#i-clip"/></svg>粘贴剪贴板 (Ctrl+V)</div>
+        <div class="btn dis"><svg class="ic"><use href="#i-crop"/></svg>清除框选</div>
+        <span class="actsep"></span>
+        <div class="btn"><svg class="ic"><use href="#i-trash"/></svg>移除图片</div>
+      </div>
+    </div>
+
+    <!-- ── 工作区 613 ── -->
+    <div class="split">
+      <!-- 左栏 -->
+      <div class="leftcol">
+        <div class="stage-holder">
+          <!-- 预览：三码大图（示意，等比缩放后的占位） -->
+          <div style="width:472px;height:472px;background:
+            repeating-linear-gradient(45deg,#dfe3ea 0 8px,#eceff4 8px 16px);
+            border:1px solid var(--dt-border);display:flex;align-items:center;justify-content:center;
+            color:var(--dt-text-subtle);font-size:12px;gap:10px">
+            <div style="text-align:center;line-height:1.8">载入的图片（1266×763 截图示意）<br>
+              <span class="mono" style="font-size:11.5px">900 × 660 px ｜ 预览等比缩放至 460 × 337</span><br>
+              <span style="font-size:11.5px">框选层尺寸与图片显示尺寸严格一致</span></div>
+          </div>
+        </div>
+        <div class="meta">剪贴板图片｜整图 900×660</div>
+        <div class="hint">提示：可用鼠标在图上拖拽框选，只识别框内区域。</div>
+      </div>
+
+      <div class="divider"><i></i></div>
+
+      <!-- 右栏 -->
+      <div class="rightcol">
+        <!-- 结果区标题行 32：只剩「识别结果 + 计数」，清空已上移到页签行（批注 C 确认：清的是图） -->
+        <div class="rhead">
+          <span class="rt">识别结果</span>
+          <span class="cnt">9</span>
+          <span class="spacer"></span>
+          <span class="rmeta">共 9 个二维码 · 显示 6 个</span>
+        </div>
+
+        <div class="rbox" style="margin-top:8px">
+          <!-- 卡片 1 -->
+          <div class="rcard">
+            <div class="rchead">
+              <span class="rnum">#1</span><span class="rfmt">QR_CODE</span>
+              <span class="ract">
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-copy"/></svg>复制</span>
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-globe"/></svg>打开</span>
+              </span>
+            </div>
+            <div class="rtext url">https://test-ding-lot.ddzm.tech/e/21792801/p/2</div>
+          </div>
+          <!-- 卡片 2 -->
+          <div class="rcard">
+            <div class="rchead">
+              <span class="rnum">#2</span><span class="rfmt">QR_CODE</span>
+              <span class="ract">
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-copy"/></svg>复制</span>
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-globe"/></svg>打开</span>
+              </span>
+            </div>
+            <div class="rtext url">https://test-ding-lot.ddzm.tech/e/21792801/p/2</div>
+          </div>
+          <!-- 卡片 3 -->
+          <div class="rcard">
+            <div class="rchead">
+              <span class="rnum">#3</span><span class="rfmt">QR_CODE</span>
+              <span class="ract">
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-copy"/></svg>复制</span>
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-globe"/></svg>打开</span>
+              </span>
+            </div>
+            <div class="rtext url">https://test-ding-lot.ddzm.tech/e/21792801/p/2</div>
+          </div>
+          <!-- 卡片 4 -->
+          <div class="rcard">
+            <div class="rchead">
+              <span class="rnum">#4</span><span class="rfmt">QR_CODE</span>
+              <span class="ract">
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-copy"/></svg>复制</span>
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-globe"/></svg>打开</span>
+              </span>
+            </div>
+            <div class="rtext url">https://test-ding-lot.ddzm.tech/e/21792801/p/2</div>
+          </div>
+          <!-- 卡片 5 -->
+          <div class="rcard">
+            <div class="rchead">
+              <span class="rnum">#5</span><span class="rfmt">QR_CODE</span>
+              <span class="ract">
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-copy"/></svg>复制</span>
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-globe"/></svg>打开</span>
+              </span>
+            </div>
+            <div class="rtext url">https://test-ding-lot.ddzm.tech/e/21792801/p/2</div>
+          </div>
+          <!-- 卡片 6（本页最后一整张）。
+               Q2 定案：只展示 6 张整，第 7 张不再「露半截」——
+               列表容器 573 高里，6 张整占 498.5，底部留 74.5px 空白。
+               超出 6 张的部分由内层滚动条承接（用户滚一下就能看到 #7 起的内容）。 -->
+          <div class="rcard">
+            <div class="rchead">
+              <span class="rnum">#6</span><span class="rfmt">QR_CODE</span>
+              <span class="ract">
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-copy"/></svg>复制</span>
+                <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-globe"/></svg>打开</span>
+              </span>
+            </div>
+            <div class="rtext url">https://test-ding-lot.ddzm.tech/e/21792801/p/2</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右栏内层滚动条（贴在结果列表右缘内侧，不越出画布）。
+         轨道 = 列表容器高 573；滑块按「6 张可见 / 共 9 张」≈ 2/3 轨道 ≈ 382px。 -->
+    <div class="scrollv" style="left:1247px;top:190px;height:573px"><i style="top:0;height:382px"></i></div>
+  </div>
+
+  <!-- 注释 chip：A / B / C
+       定位依据（实测）：页签行 y∈[107,145] 内，页签右缘 492、首个动作按钮左缘 734.5
+       → x∈[500,730] 是空档。其余 chip 落在左栏虚线拖放区的空白内壁（该区除中央提示外全空），
+       不遮任何真实控件与卡片文字。 -->
+  <div class="anno red" style="left:516px;top:116px"><span class="num">A</span>动作行搬到这里</div>
+  <div class="anno" style="left:516px;top:196px"><span class="num">C</span>清空改名「移除图片」→ 页签行右端第 4 位</div>
+  <div class="anno green" style="left:516px;top:236px"><span class="num">B</span>动作下移进卡片</div>
+</div>
+
+<div class="ruler">
+  <div style="height:86px"><span class="h">86</span> 详情页页头<div class="note">返回 + 23px 标题 + 面包屑</div></div>
+  <div style="height:64px"><span class="h">64</span> 上留白 16 + 页签行 48
+    <span class="an"><span class="tg">A</span>批注 A：三个取输入动作搬到这里。
+    与页签同排，右端正好有约 620px 空档。</span></div>
+  <div style="height:613px"><span class="h">613</span> 工作区（SplitPane）
+    <span class="an">左栏预览 <span class="key">565</span>（+72）<br>
+      右栏结果 标题行 32 + 间距 8 + 列表 <span class="key">573</span></span>
+    <span class="an q"><span class="tg">B</span>批注 B：底部按钮行整行删除；
+      复制 / 打开下移到每条卡片头部。</span>
+    <span class="an q"><span class="tg">C</span>批注 C：清空改名「移除图片」，接到页签行右端第 4 位（清的是图，与取输入同类）。</span>
+  </div>
+</div>
+</div>
+<p class="tiny">加总校验：86 + 64 + 613 = <b>763</b>（其中 64 = 上留白 16 + 页签行 48）。右侧标尺每一格的高度与该行的实测高度一致。</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">07</span>图 2 · 空态（1266 × 763 真实尺寸，1:1）</h2>
+<p class="small">状态：刚进入页面，尚未载入图片。<b>这一屏用来核对</b>：动作按钮在页签行右端后，
+「取输入」的入口是否仍然一眼可见（它现在离预览框更远了）。</p>
+
+<div class="stage">
+<div class="win">
+  <div class="sb">
+    <div class="sb-brand">
+      <div class="sb-logo"><svg class="ic ic-16"><use href="#i-layers"/></svg></div>
+      <div><div class="sb-name">ToolNest</div><div class="sb-sub">工具巢</div></div>
+    </div>
+    <div class="sb-all on"><svg class="ic"><use href="#i-layers"/></svg>所有工具<span class="cnt">11</span></div>
+    <div class="sb-search"><svg class="ic"><use href="#i-search"/></svg>搜索功能…</div>
+    <div class="sb-cap">功能分类</div>
+    <div class="sb-grow">
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>转换类型工具<span class="cnt">2</span></div>
+      <div class="sb-item leaf">时间戳转换</div>
+      <div class="sb-item leaf">Cron 表达式解析</div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>编码/解码类型工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>格式化类型工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>生成类型工具<span class="cnt">2</span></div>
+      <div class="sb-item leaf">二维码</div>
+      <div class="sb-item leaf">UUID 生成</div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>文本处理类型工具<span class="cnt">2</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>网络请求工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>图片处理类型工具<span class="cnt">1</span></div>
+      <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg>文件处理类型工具<span class="cnt">1</span></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="pgh">
+      <div class="pgh-row">
+        <div class="pgh-back"><svg class="ic-12"><use href="#i-aleft"/></svg>返回</div>
+        <div class="pgh-title">二维码</div>
+      </div>
+      <div class="pgh-crumb">生成类型工具 › 二维码</div>
+    </div>
+
+    <div class="bizrow">
+      <div class="seg"><span class="on">解析二维码</span><span>生成二维码</span></div>
+      <div class="actrow">
+        <div class="btn"><svg class="ic"><use href="#i-image"/></svg>选择图片…</div>
+        <div class="btn"><svg class="ic"><use href="#i-clip"/></svg>粘贴剪贴板 (Ctrl+V)</div>
+        <div class="btn dis"><svg class="ic"><use href="#i-crop"/></svg>清除框选</div>
+        <span class="actsep"></span>
+        <div class="btn dis"><svg class="ic"><use href="#i-trash"/></svg>移除图片</div>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="leftcol">
+        <div class="stage-holder drop">
+          <div class="rempty" style="gap:9px">
+            <svg class="ic" style="width:26px;height:26px;stroke-width:1.4"><use href="#i-qr"/></svg>
+            <div class="et">尚未载入图片</div>
+            <div class="eh">点击「选择图片…」或「粘贴剪贴板」，<br>也可以把图片文件直接拖到这里</div>
+          </div>
+        </div>
+        <div class="meta">等待载入</div>
+        <div class="hint">提示：可用鼠标在图上拖拽框选，只识别框内区域。</div>
+      </div>
+
+      <div class="divider"><i></i></div>
+
+      <div class="rightcol">
+        <div class="rhead">
+          <span class="rt">识别结果</span>
+          <span class="cnt" style="background:transparent;border:1px dashed var(--dt-border-strong)">0</span>
+          <span class="spacer"></span>
+          <span class="rmeta">—</span>
+        </div>
+        <div class="rbox" style="margin-top:8px">
+          <div class="rempty">
+            <svg class="ic" style="width:26px;height:26px;stroke-width:1.4"><use href="#i-qr"/></svg>
+            <div class="et">尚无识别结果</div>
+            <div class="eh">载入图片后会自动识别，多个二维码会逐个列出</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scrollv" style="left:1262px;top:150px;height:613px;opacity:0"></div>
+  </div>
+
+  <!-- 与 Fig1 同样的空档：页签右缘 492 → 首个动作按钮左缘 734.5，x∈[500,730] 无人占用 -->
+  <div class="anno" style="left:516px;top:116px">四个动作始终在位 · 位置固定</div>
+  <div class="anno gray" style="left:516px;top:196px">「移除图片」置灰（无可移除的图）</div>
+</div>
+
+<div class="ruler">
+  <div style="height:86px"><span class="h">86</span> 详情页页头</div>
+  <div style="height:64px"><span class="h">64</span> 上留白 16 + 页签行 48
+    <span class="an">空态下四个动作<b>全部在位</b>（用 <code>setDegraded</code> 表达不可用，
+      不隐藏）。「清除框选」无框选时降级、「移除图片」无图时降级。</span></div>
+  <div style="height:613px"><span class="h">613</span> 工作区
+    <span class="an">左：虚线拖放区 <span class="key">565</span>（原 492.7）<br>
+      右：结果区标题行 + 空态（垂直居中）</span></div>
+</div>
+</div>
+<p class="tiny">加总校验：86 + 64 + 613 = <b>763</b>（其中 64 = 上留白 16 + 页签行 48）。</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">08</span>组件细节 · 4× 放大</h2>
+
+<h3 class="sub">① 页签 + 动作 同行（批注 A 的落点；批注 C 的「移除图片」也在这一行）</h3>
+<div class="zoom"><div class="z4">
+  <div class="bizrow" style="padding:0">
+    <div class="seg"><span class="on">解析二维码</span><span>生成二维码</span></div>
+    <div class="actrow">
+      <div class="btn"><svg class="ic"><use href="#i-image"/></svg>选择图片…</div>
+      <div class="btn"><svg class="ic"><use href="#i-clip"/></svg>粘贴剪贴板 (Ctrl+V)</div>
+      <div class="btn dis"><svg class="ic"><use href="#i-crop"/></svg>清除框选</div>
+      <span class="actsep"></span>
+      <div class="btn"><svg class="ic"><use href="#i-trash"/></svg>移除图片</div>
+    </div>
+  </div>
+</div></div>
+<div class="callouts">
+  <div><span class="mk">行高 48</span>（Tab 头 38 + 下留白 10，与页签共用同一行）</div>
+  <div><span class="mk">页签轨道 38</span> ／ 滑块 32</div>
+  <div><span class="mk">动作按钮 32</span> 次操作级（非主色实底）</div>
+  <div><span class="mk">间距</span> 页签与动作之间由 <code>spacer()</code> 弹性撑开，最小值 16</div>
+  <div><span class="mk">分隔线</span> 1×18，把「取输入」三个与「丢弃」一个分开</div>
+</div>
+<p class="small" style="margin-top:8px">
+<b>为什么动作不是主操作级</b>：选择文件 / 粘贴剪贴板只是「取输入」，不是把输入提交出去。
+按 DESIGN.md 的按钮四级划分，它们属于次操作级。<b>本页没有任何主色实底按钮</b> ——
+解析是「载入即自动识别」，没有需要用户按下的提交动作。这一条与改造前一致，未变。</p>
+
+<h3 class="sub">② 结果卡片（批注 B：动作挂进卡片）</h3>
+<div class="zoom"><div class="z4">
+  <div style="display:flex;flex-direction:column;gap:8px;width:449px">
+    <div class="rcard">
+      <div class="rchead">
+        <span class="rnum">#1</span><span class="rfmt">QR_CODE</span>
+        <span class="ract">
+          <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-copy"/></svg>复制</span>
+          <span class="btn quiet sm"><svg class="ic ic-12"><use href="#i-globe"/></svg>打开</span>
+        </span>
+      </div>
+      <div class="rtext url">https://test-ding-lot.ddzm.tech/e/21792801/p/2</div>
+    </div>
+  </div>
+</div></div>
+<div class="callouts">
+  <div><span class="mk">卡片高 74.75</span>（10 + 头行 28 + 6 + 正文 18.75 + 2）</div>
+  <div><span class="mk">头行 28</span>：#序号 + 格式标签 + 右端动作组</div>
+  <div><span class="mk">动作用静默级</span> <code>quietButton</code>，主色文字、无底无框</div>
+  <div><span class="mk">「打开」永远在位</span>（Q6 定案：不论内容是否网址，都不隐藏、不置灰）</div>
+</div>
+
+<h3 class="sub">③ 结果区标题行（不再承载动作）</h3>
+<div class="zoom"><div class="z4">
+  <div class="rhead" style="width:449px">
+    <span class="rt">识别结果</span><span class="cnt">3</span>
+    <span class="spacer"></span>
+    <span class="rmeta">共 3 个二维码</span>
+  </div>
+</div></div>
+<div class="callouts">
+  <div><span class="mk">行高 32</span></div>
+  <div><span class="mk">计数角标 0 / 3</span> 等宽字，无结果时置为透明底虚线边</div>
+  <div><span class="mk">右端</span> 只放<b>只读</b>的汇总说明，不放任何可点控件</div>
+</div>
+
+<div class="notice" style="margin-top:12px">
+<svg class="ic ic-12"><use href="#i-info"/></svg>
+<span><b>批注 C 的确认结论（本条已按你的选择改定）</b>：
+「清空」清的是<b>图片</b>（连同结果一起回空态），因此它与「选择图片／粘贴剪贴板／清除框选」同属
+「对<em>图</em>做操作」的一类，<b>移到页签行右端第 4 个位置</b>，并以 1px 分隔线与前三个「取输入」动作分开。
+它同时从 <code>dangerButton</code> 降为 <code>quietButton</code>：破坏性改由
+<b>① 文案「移除图片」（比「清空」更明确）② 垃圾桶图标 ③ 悬停时的危险色提示</b> 三处共同承担，
+不再靠整块危险色描边去和「复制」抢视线。<b>结果区标题行因此不再承载动作</b>，只留「识别结果 + 计数」。</span></div>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">09</span>节点级改动清单</h2>
+<table class="t">
+<thead><tr><th style="width:200px">原节点</th><th style="width:80px">处置</th><th>落法</th><th style="width:80px">增减 px</th></tr></thead>
+<tbody>
+<tr><td><code>leftBox</code> 内的按钮行<br><span class="tiny">openBtn / pasteBtn / decodeClearSelBtn</span></td>
+    <td><span class="pass y">上移</span></td>
+    <td>移入页签行：<code>bizrow = new HBox(seg, spacer(), actrow)</code>。<b>注意</b>页签是 <code>TabPane</code> 自带的
+        Tab 头，不能直接放进 HBox —— 需把动作行做成 <code>TabPane</code> 同级的 HBox，与 TabPane 共处一行
+        （实现见 spec §2.1，两种做法与取舍都在里面）。</td>
+    <td class="mono">−40 ／ +32</td></tr>
+<tr><td><code>decodeStage</code> 预览区</td><td><span class="pass g">保留</span></td>
+    <td>加 <code>VGrow(ALWAYS)</code> 吃掉剩余高度；上限仍 460 见方（<code>PREVIEW_MAX</code> 不变）。</td>
+    <td class="mono">+72</td></tr>
+<tr><td><code>decodeMeta</code> 元信息行</td><td><span class="pass g">保留</span></td>
+    <td>位置不变（预览框下方）。</td><td class="mono">0</td></tr>
+<tr><td><code>rightBox</code> 底部按钮行<br><span class="tiny">copyBtn / openUrlBtn / clearBtn</span></td>
+    <td><span class="pass r">删除</span></td>
+    <td>整行从 <code>rightBox</code> 移除。三个动作的去处：复制 + 打开 → 卡片头（<span class="tag">B</span>）；
+        <b>清空 → 页签行右端第 4 位</b>，改名「移除图片」（<span class="tag">C</span>，已按你的确认定案）。</td>
+    <td class="mono">−44</td></tr>
+<tr><td><code>decodeNotice</code> 提示条</td><td><span class="pass g">保留</span></td>
+    <td>留在结果区底部（错误就近内联的原则不变）。<b>但注意</b>它现在会占用结果列表的高度，
+        spec §2.4 给出「提示条出现时列表让位的具体算法」。</td>
+    <td class="mono">0</td></tr>
+<tr><td><code>resultScroll</code> 结果滚动区</td><td><span class="pass g">保留</span></td>
+    <td>外面套一层 <code>rightBox</code>（标题行 + 列表 + 提示条）。</td><td class="mono">0</td></tr>
+<tr><td>结果区标题行（新增）</td><td><span class="pass g">新增</span></td>
+    <td><code>HBox(Label「识别结果」, Label 计数, spacer(), Label 汇总说明)</code>，高 32，
+        <b>不含任何可点控件</b>（清空已移走）。</td>
+    <td class="mono">+32+8</td></tr>
+<tr><td><code>resultCard</code> 单卡</td><td><span class="pass y">改造</span></td>
+    <td>头行由 <code>HBox(number, format, spacer(), copy)</code> 改为
+        <code>HBox(number, format, spacer(), copyQuiet, openQuiet)</code>；「打开」按钮的可用性
+        由「内容是否是 http(s) 网址」决定，抽成一个方法供两条路径共用。</td>
+    <td class="mono">0（卡高不变）</td></tr>
+<tr><td><code>clearDecode()</code> / <code>allResultsText()</code></td><td><span class="pass g">都保留</span></td>
+    <td><code>clearDecode()</code> 行为不变，改由页签行右端的「移除图片」调用；它同时清图 + 清结果，
+        与改造前一致（这也正是「清空」属于「图」类动作的依据）。
+        <b><code>allResultsText()</code> 不要删</b>：按 Q7 去掉的只是<b>界面上的</b>「复制全部」入口，
+        但该方法仍有第二个调用方 <code>decodeResultTextForTest()</code>（约 1317 行），
+        它是 <code>qrlist</code> / <code>qr</code> 探针断言「数据到界面不丢东西」的测量手段。
+        删它会连带拆掉断言 —— 属于「为清理死代码而破坏验证」，不值。</td><td class="mono">0</td></tr>
+<tr><td>页签行右端「移除图片」（<b>新增</b>）</td><td><span class="pass y">新增</span></td>
+    <td>第 4 个动作，用 1px 分隔线与前三个「取输入」分开；<code>quietButton</code> 形态，
+        无图时 <code>setDegraded</code> 降级（<b>不隐藏</b>，位置固定）。</td>
+    <td class="mono">0（在已有 48px 行内）</td></tr>
+</tbody>
+</table>
+
+<p class="small" style="margin-top:10px"><b>净变化</b>：左栏 −40 + 38（预览框吃掉），右栏 −44 + 40（标题行），
+底部 0。全页没有新增任何 32px 可选按钮行 —— 这是本轮唯一真正「净赚」的 40px。
+但如 §04 所述，右栏的 44px 里有 40px 又被新的标题行吃回去了。
+<b>「移除图片」不占额外高度</b>：它落在已有的 48px 页签行（38 页签带）内，横向上 4 个按钮合计 502.5px，
+页签行可用带 702px，余量 199.5px。</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">10</span>不变量检查表</h2>
+<table class="t">
+<thead><tr><th style="width:38px">#</th><th style="width:240px">不变量（来自 DESIGN.md）</th><th style="width:88px">判定</th><th>证据</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td>一屏只有一处主色实底按钮</td><td><span class="pass g">通过</span></td>
+    <td>本页主色实底数 = <b>0</b>。三个取输入动作是次操作级，卡片内动作是静默级。
+        解析是「载入即自动识别」，本就没有提交动作。</td></tr>
+<tr><td class="n">2</td><td>一屏只有一个最大字级（详情页标题 23px）</td><td><span class="pass g">通过</span></td>
+    <td>全页仅「二维码」23px 一处；其余最大 13.5px（页签、按钮）。</td></tr>
+<tr><td class="n">3</td><td>控件高度只取 32 / 36 / 30 / 28 四档</td><td><span class="pass g">通过</span></td>
+    <td>页签行四个动作按钮与结果区标题行 32；页签滑块 32；卡片内动作 <b>28</b>（紧凑档，<code>.btn.sm</code>）。
+        <b>「移除图片」取 32 档</b>（与同行三个邻居齐高），不再出现 24px 的越档值。</td></tr>
+<tr><td class="n">4</td><td>两层页签形态不同</td><td><span class="pass g">通过</span></td>
+    <td>本页只有一层页签（外层胶囊轨道 + 滑块），未引入内层页签，不触发该条。</td></tr>
+<tr><td class="n">5</td><td>静止界面无常驻阴影；阴影只用于悬停与按下</td><td><span class="pass g">通过</span></td>
+    <td>画布内所有卡片与按钮均无 <code>box-shadow</code>；仅选中卡用 2px 主色浅边描边（非阴影）。</td></tr>
+<tr><td class="n">6</td><td>颜色永不是唯一线索</td><td><span class="pass g">通过</span></td>
+    <td>「移除图片」有文字 + 垃圾桶图标；格式标签有 <code>QR_CODE</code> 文字；网址用主色但内容本身可读。</td></tr>
+<tr><td class="n">7</td><td>图标一律走 <code>ui/Icons.java</code>，不用 Unicode / emoji</td><td><span class="pass g">通过</span></td>
+    <td>本页所有图标为内联手写 SVG（「打开」用 <code>external</code>、复制用 <code>copy</code>）。
+        <b>已核实：</b><code>copy</code> / <code>external</code> 已在 <code>Icons.java</code> 注册；
+        <b><code>trash</code> 尚未注册</b>，实施时需新增（见 spec §2.5）。</td></tr>
+<tr><td class="n">8</td><td>不用只读文本域装「可能有多条」的结果</td><td><span class="pass g">通过</span></td>
+    <td>保持卡片堆叠结构不变（<code>qrlist</code> 探针守的行为不回归）。</td></tr>
+<tr><td class="n">9</td><td>详情页装不下时只能滚动，不压缩</td><td><span class="pass g">通过</span></td>
+    <td>外层 <code>ScrollPane</code> + <code>minHeight = USE_PREF_SIZE</code> 外壳逻辑不动；本页新增的内层滚动在结果列表上。</td></tr>
+<tr><td class="n">10</td><td>滚动条必须能被发现（<code>-fx-opacity: 1</code>）</td><td><span class="pass g">通过</span></td>
+    <td>图中右缘显式画出内层滚动条（11px 宽、4px thumb、<code>-dt-scrollbar</code>）。
+        按 Q2 定案，超 6 张时滚动条全程可用且有可见滑块（不靠 hover 才出现）。</td></tr>
+<tr><td class="n">11</td><td>单位必须可见（<code>px</code> / <code>秒</code> / <code>ms</code> 不藏进 tooltip）</td><td><span class="pass g">通过</span></td>
+    <td>本页唯一带单位的文本是元信息行的 <code>900×660</code>（像素尺寸）与提示行的鼠标操作说明，均可见。</td></tr>
+<tr><td class="n">12</td><td>按钮状态切换不改变尺寸</td><td><span class="pass g">通过</span></td>
+    <td>「移除图片」置灰（空态）时只改文字色与不透明度，尺寸不变（见 §07 空态图）。</td></tr>
+<tr><td class="n">13</td><td>不用灰色实底方框做区块；区块数量克制（1–3）</td><td><span class="pass g">通过</span></td>
+    <td>本页零 <code>.card</code> 区块 —— 左右两栏是 SplitPane 的两格，卡片只在结果列表里。</td></tr>
+<tr><td class="n">14</td><td>间距遵循「元素内 &lt; 相关项 &lt; 分组 &lt; 区块」</td><td><span class="pass g">通过</span></td>
+    <td>卡片内 6 / 卡片间 10 / 标题行与列表间 8 / 区块间（SplitPane 分隔）7。</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">11</span>需要你拍板的问题</h2>
+
+<div class="q qd">
+<div class="qh">Q1 · 「清空」的落点 —— <b>已确认，本条已定案</b></div>
+你的选择：<b>清的是「图片」（连同结果一起回空态）</b>，形态为<b>图标 + 文字</b>。
+据此定案：<br>
+· 位置：<b>页签行右端第 4 位</b>，紧跟三个取输入动作 —— 因为「清图」与「选图／粘贴」同属「对图操作」一类；<br>
+· 文案：由「清空」改为 <b>「移除图片」</b>，把「清的是图」这件事直接写在按钮上，消除歧义；<br>
+· 分隔：与前三个动作之间加 <b>1px × 18px 竖线</b>，让「取输入」与「丢弃」两组在视觉上分层；<br>
+· 形态：<code>.link-action</code> 一族（图标 + 文字），<b>不占用 32/36/30/28 四档控件高度</b>，
+  但它落在 48px 页签行内，本就有 32px 的落位空间，所以实际取 <b>32px 档</b>与三个邻居齐高，避免一行内高度参差；<br>
+· 降级：无图时 <code>setDegraded</code> 置灰（<b>不隐藏</b>），位置固定，符合「动作不随状态出现/消失」的约定；<br>
+· 结果区标题行<b>因此不再承载动作</b>，右端改放只读的汇总说明（「共 N 个二维码」）。
+</div>
+
+<div class="q qd">
+<div class="qh">Q2 · 结果区行数 —— <b>已确认，本条已定案</b></div>
+你的选择：<b>只展示 6 张整，超出部分加滚动条</b>。据此定案：<br>
+· 列表容器高 <b>573</b> 不变（右栏 613 − 标题行 32 − 间距 8）；<br>
+· 6 张整卡占 6×74.75 + 5×10 = <b>498.5px</b>，底部留 <b>74.5px</b> 空白；<br>
+· <b>不再有「裁切卡」</b>：早前版本用 <code>margin-bottom:-10.25px</code> 让第 7 张露 64.5px，
+  现按本条<b>删除</b>该做法 —— 页面上不再出现半截卡片；<br>
+· 第 7 张起的内容由<b>内层滚动条</b>承接，滚动条全程可用且有可见滑块（不变量 #10）；<br>
+· 计数徽标与汇总说明改为 <b>「9」+「共 9 个二维码 · 显示 6 个」</b>，让用户知道下面还有、需要滚。<br>
+<b>代价（已知并接受）</b>：完整卡数与改造前一样是 6 张，本轮不靠卡片数赚面积；
+真正可量化的收益是左栏预览 492.7 → 565（+72px）。
+</div>
+
+<div class="q qd">
+<div class="qh">Q3 · 清空形态 —— <b>已确认，本条已定案</b></div>
+你的选择：<b>图标 + 文字</b>。据此定案：<br>
+· 形态：<code>.link-action</code> 一族（图标 + 文字、无底无框），<b>不占用 DESIGN.md 的 32/36/30/28 四档</b>；<br>
+· 但它落在 <b>48px 页签行</b>内，该行本就有 32px 的落位空间，因此实际按 <b>32px 档</b>渲染，
+  与同行三个邻居等高 —— 避免一行内出现 24/32 参差；<br>
+· 因此原先「标题行被按钮撑高」的问题<b>自动消失</b>：标题行现在的右端是纯文本汇总说明，不含控件；<br>
+· 需要先实现一件事：<b><code>Icons.java</code> 新增 <code>trash</code> 图标</b>（当前未注册，见 spec §2.5）。<br>
+· 影响：<code>UiKit</code> 需新增 <code>linkAction(...)</code>（若判定它是可复用形态）。若不新增，
+  也可在本模块内私有实现 —— 见 spec §2.5 的取舍。
+</div>
+
+<div class="q">
+<div class="qh">Q4 · 动作按钮上移到页签行后，距预览框远了 480px</div>
+改造前「选择图片…」就在预览框正上方；改造后它跑到页签行右端，与预览框的水平距离约 480px。<br>
+<b>选项 (a)</b> 接受（<b>本稿默认</b>）：空态预览框里已经写明「点击「选择图片…」或「粘贴剪贴板」」，
+指路文字承担了这个距离。<br>
+<b>选项 (b)</b> 在预览框空态里加一个主色实底「选择图片…」按钮（但会破坏不变量 #1，本页会有 1 处主色实底）。<br>
+<b>选项 (c)</b> 动作行左对齐到左栏（与预览框左缘齐），不推到右端 —— 距离从 480 → 0，但页签行右侧会空出 520px。<br>
+<b>建议</b>：(a) 先按稿走。若实测发现用户找不到入口，再退 (c)。
+</div>
+
+<div class="q">
+<div class="qh">Q5 · 本页是否顺势把「解析 / 生成」两个页签拆成两页</div>
+改造后动作按钮与页签同行，页签行右端被占满。若后续还想加动作（如「示例图片」），空间就紧了。<br>
+<b>选项 (a)</b> 不动（<b>本稿默认</b>）：两个页签的使用节奏虽不同，但共用同一套输入通路，拆页会重复预览框代码。<br>
+<b>选项 (b)</b> 拆成侧边栏两个独立工具入口。<br>
+<b>建议</b>：(a)。且本轮的 <code>QrModule</code> 已 1502 行，拆页会让它更长（见 ADR-006）。
+</div>
+
+<div class="q qd">
+<div class="qh">Q6 · 卡片「打开」在内容非网址时怎么办 —— <b>已确认，本条已定案</b></div>
+你的选择：<b>非网址时也展示，「简单处理」</b>。据此定案：<br>
+· 卡片头的「打开」<b>永远在位</b>，不隐藏、不置灰 —— 位置恒定，用户不必先判断「这张能不能点」；<br>
+· <b>去掉现有的 tooltip</b>「内容看起来是网址时才有意义」—— 既然按钮不再按内容区分状态，
+  这条只在 hover 才读得到的解释也一并删掉。<br>
+<b>但有一处必须说明（实测源码后的更正）</b>：<code>openInBrowser()</code> <b>当前会主动拒绝非网址</b> ——
+它 <code>if (!url.startsWith("http://") && !url.startsWith("https://"))</code> 就
+<code>showNotice("当前内容不是网址，无法在浏览器打开。")</code> 并 <code>return</code>。
+所以「非网址时简单处理」有两种落法，<b>差别在点击后的行为</b>：<br>
+&nbsp;&nbsp;<b>(甲 · 本稿采用)</b> 保留这段判断：按钮永远可点，但非网址时点下去会弹一条就地提示
+（错误就近内联，符合既有原则）。← 「按钮永远展示」已满足，改动最小。<br>
+&nbsp;&nbsp;<b>(乙)</b> 删掉这段判断，非网址时也直接交给系统 <code>Desktop.browse()</code> 去试
+（会弹出系统「找不到应用」之类的原生错误）。<br>
+· 两者的<b>视觉完全一样</b>（按钮都在位、都不可灰），只有点击后的反馈不同 ——
+本稿画的是 (甲)。若你要的是 (乙)，实施时把那段 <code>if</code> 去掉即可，设计稿无需改。
+· 新增断言（两者通用）：每张卡的「打开」都 <code>isDisabled() == false</code>（不再有按内容禁用态）。
+</div>
+
+<div class="q qd">
+<div class="qh">Q7 · 是否保留「复制全部」—— <b>已确认：去掉</b></div>
+你的选择：<b>去掉「复制全部」</b>。据此定案：<br>
+· 底部按钮行删掉后，<b>不补</b>任何「复制全部」入口 —— 早前版本在 Q5 里留过「若要则加在结果区标题行」的口子，<b>该口子关闭</b>；<br>
+· 复制能力只保留在每张卡片内部（一码一复制），与「一码一卡」的结构一致；<br>
+· 结果区标题行因此<b>确认不含任何可点控件</b>（与本轮其它结论一致，无例外）。<br>
+<b>代价（已知并接受）</b>：用户想一次性拿走全部结果时，需逐张复制。若后续此需求变强，
+再评估「卡片列表的右键菜单 / 全选」等不占常驻空间的做法。
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">12</span>测量与验证口径</h2>
+<h3 class="sub">改造前数字的来源</h3>
+<p class="small">下表数字由一次性测量探针在真实 1266×763 窗口、真实主题（PrimerLight）、真实样式表下渲染后，
+逐节点取 <code>localToScene(boundsInLocal)</code> 打印得到：</p>
+<table class="t">
+<thead><tr><th style="width:280px">节点</th><th style="width:100px">实测 y</th><th style="width:100px">实测高</th><th style="width:100px">实测宽</th></tr></thead>
+<tbody>
+<tr><td>场景（窗口内容区）</td><td class="n">—</td><td class="n">726.0</td><td class="n">1251.0</td></tr>
+<tr><td><code>.detail-wrapper</code></td><td class="n">0.0</td><td class="n">726.0</td><td class="n">984.7</td></tr>
+<tr><td><code>.page-header-detail</code></td><td class="n">0.0</td><td class="n">86.0</td><td class="n">984.7</td></tr>
+<tr><td><code>.detail-scroll</code>（视口）</td><td class="n">86.0</td><td class="n">640.0</td><td class="n">984.7</td></tr>
+<tr><td><code>.module-body</code>（内容，需 716.7 &gt; 视口 640）</td><td class="n">86.0</td><td class="n">716.7</td><td class="n">973.3</td></tr>
+<tr><td><code>.qr-tabs</code></td><td class="n">102.0</td><td class="n">684.7</td><td class="n">925.3</td></tr>
+<tr><td><code>.tab-content-area</code></td><td class="n">150.7</td><td class="n">636.0</td><td class="n">925.3</td></tr>
+<tr><td>解析页 <code>SplitPane</code></td><td class="n">168.7</td><td class="n">618.0</td><td class="n">926.0</td></tr>
+<tr><td>左栏动作行 <code>HBox</code></td><td class="n">168.7</td><td class="n">32.0</td><td class="n">480.0</td></tr>
+<tr><td>左栏预览框</td><td class="n">210.7</td><td class="n">492.7</td><td class="n">480.0</td></tr>
+<tr><td>右栏结果滚动区</td><td class="n">168.7</td><td class="n">574.0</td><td class="n">442.7</td></tr>
+</tbody>
+</table>
+
+<div class="notice" style="margin-top:12px">
+<svg class="ic ic-12"><use href="#i-warn"/></svg>
+<span><b>两处口径必须说清楚，否则数字对不上</b>：<br>
+① <b>窗口 1266×763 ↔ 场景 1251×726</b>：763 是含标题栏与边框的窗口高，减去窗口 chrome 后场景为 726。
+面积预算表里写 763 是因为<b>产品截图与历史设计稿都以 763 为口径</b>；但实测节点 y 值都在 726 坐标系里。<br>
+② <b>内容 618 vs 视口 628.3</b>：SplitPane 实测 618 高，而按 763 − 86 − 48.7 算出的可用高是 628.3，差 10.3 由
+<code>.module-body</code> 的上留白与 SplitPane 的取整吸收。表中同时对两者做了标注，不做四舍五入掩盖。</span></div>
+
+<h3 class="sub">本稿的验证计划（实施后执行）</h3>
+<table class="t">
+<thead><tr><th style="width:250px">要断言的事</th><th>怎么断言（落在渲染结果，不落在属性）</th></tr></thead>
+<tbody>
+<tr><td>动作行与页签在同一行</td><td><code>qrpic</code> 探针：取 <code>y</code> 与 <code>height</code> 实测值，断言动作行 <code>HBox</code> 的
+    <code>minY</code> 落在页签头（48.7 高）的纵向区间内，且其右缘 &gt; 页签右缘（确认「右端」）。</td></tr>
+<tr><td>底部不再有按钮行</td><td>断言结果区 <code>rightBox</code> 的直接子节点里，<b>不含「只放按钮、不含卡片」的行</b>（含 Button 但无 <code>.qr-result-card</code> 后代）。
+    <b>不要</b>断言「全页 Button 总数减少」—— 底部删 4 个、卡片内每张新增 2 个，净增减随结果数变化，写死数字会让断言随数据漂移。</td></tr>
+<tr><td>复制动作挂在卡片内</td><td>断言第 N 张 <code>.qr-result-card</code> 的后代里存在一个文字为「复制」的按钮 —— 这是「不丢数据」的姊妹断言。</td></tr>
+<tr><td>预览框实际可见高</td><td>断言 <code>decodeStage</code> 的实测 <code>height</code> == <b>565</b>（改造前实测 492.7，+72）。反向验证：把动作行移回左栏，该值应掉回 ≈493（−32 动作行 −8 间距 = 40，另因预览框是吃剩余的弹性节点，撤掉后由页头/页签那 10.3 的取整余量回补一部分，故不是精确 532.7）。</td></tr>
+<tr><td>「移除图片」在页签行右端且会清掉已载入的图</td><td>两条一起断言：① 该按钮的父节点是页签行动作行 <code>HBox</code>（不是结果区标题行）；
+    ② 触发后 <code>decodeSourceForTest()</code> 为 null 且预览区图为 null（沿用既有断言）。</td></tr>
+<tr><td>结果区标题行内不含可点控件</td><td>断言标题行 <code>HBox</code> 的后代中 <code>Button</code> 数量 == 0。</td></tr>
+<tr><td><b>Q2：只展示 6 张整</b></td><td>断言结果列表内的卡片节点数 == <b>6</b>（造 9 个结果）；并断言第 6 张下沿到容器底沿的间距 &gt; 40px（是留白，不是被裁的半截卡）。
+    <b>反向验证</b>：加回第 7 张裁切卡，两条都应变红。</td></tr>
+<tr><td><b>Q6：「打开」永远可点</b></td><td>断言每张卡的「打开」都 <code>isDisabled() == false</code>（不论卡内文本是否网址）。
+    <b>反向验证</b>：给非网址卡加 <code>setDisable(true)</code>，断言变红。</td></tr>
+<tr><td>结果区不丢数据（回归）</td><td><b>口径必须改</b>：`qrlist` 原有「卡片数 == 结果数」的断言，在 Q2 定案后<b>不再成立</b>（9 个结果只画 6 张卡）。
+    改为断言：<b>「列表卡片数 == min(结果数, 6)」</b> 且 <b>「滚动内容总高 ≥ 结果数所需高」</b>——
+    即数据没丢，只是超出了可视区。<b>这一步不能省</b>：直接放宽成「卡片数 ≤ 结果数」会让断言失去意义。</td></tr>
+</tbody>
+</table>
+<p class="small" style="margin-top:8px"><b>计数只许升不许降</b>：本轮若新增断言，<code>qrpic</code> 的 40 条只增不减；
+<code>qrlist</code> 的 6 条与 <code>sel</code> 的 20 条不得回归。新增断言必须做反向验证（破坏实现确认变红）。</p>
+<p class="small" style="margin-top:6px"><b class="warn">注意：与 Q2 的冲突已手工消解</b> —— `qrlist` 现有 6 条里若有「界面卡片数 == 结果数」，
+必须按上表改为 <code>min(结果数, 6)</code> —— 否则 Q2 一落地，这条就会红，
+而且红得「正确」（它守的正是被本轮有意打破的性质）。这是本轮<b>唯一需要改动既有断言语义</b>的地方。</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="block">
+<h2><span class="idx">13</span>范围与已知取舍</h2>
+<table class="t">
+<thead><tr><th style="width:220px">项</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><b>在范围内</b></td><td>解析页签的：动作行位置（含新增的「移除图片」）、结果区结构（标题行 + 卡片）、卡片内动作。</td></tr>
+<tr><td><b>明确不在范围内</b></td><td>生成页签；<code>PREVIEW_MAX</code> 的取值；框选逻辑与坐标换算；外层外壳（<code>ContentPane</code> / <code>MainWindow</code> / 侧边栏）。</td></tr>
+<tr><td><b>共享代码影响</b></td><td><b>两个新增点是全站共享构件，会影响所有页 —— 本轮唯一的外溢风险：</b>
+    ① <code>Icons.java</code> 新增 <code>trash</code> 图标（纯新增，不改既有图标，零回归风险）；
+    ② 若新增 <code>UiKit.linkAction</code>（Q3 选的图标+文字形态），它是<b>共享工厂方法</b>，
+    需在 spec §2.5 单独标注其样式契约与不变量约束。</td></tr>
+<tr><td><b>已确认的取舍</b></td><td>结果区完整卡片数不变（§04 已明写）；动作按钮与预览框水平距离增大（§11-Q4）。
+    两项作为<b>确认过的取舍</b>列出，不当作「通过」。</td></tr>
+<tr><td><b>未执行</b></td><td>未做 820×560 窄窗降级图（本页是双栏，窄窗下两栏都被压，行为与改造前一致，未变差）；
+    未做键盘全流程走查；未做对比度实测。</td></tr>
+</tbody>
+</table>
+</div>
+
+<p class="foot">ToolNest · 二维码解析页重排评审 v1 ·
+评审画布 1266×763（1:1） · 单文件零依赖 · 图标为内联 SVG · 正文不含 Unicode 装饰符号</p>
+
+</div>
+</body>
+</html>

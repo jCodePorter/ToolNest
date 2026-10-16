@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>HTTP 单一请求页 · 重设计评审 v1 · ToolNest</title>
+<style>
+/* ============================================================
+   设计令牌 —— 与 src/main/resources/css/app.css 的 .root 逐条对应。
+   必须定义在 :root（不是画布类上）：后加的区块一旦落在画布类作用域之外，
+   var() 会解析为空，描边与滚动条会静默消失。
+   ============================================================ */
+:root{
+  --dt-canvas:#f2f4f7; --dt-content-bg:#f8f9fb; --dt-surface:#ffffff;
+  --dt-surface-alt:#fafbfc; --dt-surface-sunken:#f2f4f7; --dt-surface-hover:#e8ecf2;
+  --dt-border:#e6eaef; --dt-border-faint:#f0f3f7; --dt-border-strong:#d2d7de;
+  --dt-text:#16181d; --dt-text-muted:#5a6169; --dt-text-subtle:#8b929c; --dt-text-invert:#ffffff;
+  --dt-accent:#2563eb; --dt-accent-hover:#1d4fd7; --dt-accent-pressed:#1843bd;
+  --dt-accent-soft:#eaf0fe; --dt-accent-border:#b8cdfb;
+  --dt-success:#167a4a; --dt-warning:#a1590a; --dt-danger:#c33333;
+  --dt-danger-soft:#fdf1f1; --dt-warning-soft:#fdf6ec; --dt-danger-border:#f0c4c4;
+  --dt-segmented-track:#eef1f5; --dt-segmented-thumb:#ffffff; --dt-segmented-edge:#dfe4ea;
+  --dt-neutral-chip:#e7eaef; --dt-row-alt:#fcfcfd; --dt-row-hover:#f5f7fa;
+  --dt-selection:#cfe0fd; --dt-scrollbar:#b3bac4; --dt-scrollbar-hover:#8b929c;
+  --ui:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI","PingFang SC",sans-serif;
+  --mono:"Cascadia Mono","Consolas","Microsoft YaHei UI",monospace;
+}
+
+/* ============================================================
+   评审页本体
+   ============================================================ */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:#eceff3;font-family:var(--ui);font-size:13px;line-height:1.6;color:var(--dt-text)}
+.doc{max-width:1800px;margin:0 auto;padding:30px 26px 110px}
+h1{font-size:24px;font-weight:700;margin:0 0 8px}
+h2{font-size:17px;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:9px}
+h2 .idx{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--dt-accent);
+        background:var(--dt-accent-soft);border-radius:6px;padding:2px 7px}
+h3{font-size:14px;font-weight:700;margin:22px 0 10px;color:var(--dt-text)}
+h3.sub{font-size:13px;font-weight:700;margin:20px 0 8px;color:var(--dt-text-muted)}
+p{margin:0 0 10px}
+.lead{font-size:13.5px;color:var(--dt-text-muted);max-width:1220px}
+.block{background:#fff;border:1px solid var(--dt-border);border-radius:12px;
+       padding:22px 24px;margin:0 0 18px}
+.hr{height:1px;background:var(--dt-border-faint);margin:18px 0}
+code,.mono{font-family:var(--mono);font-size:12px}
+code{background:var(--dt-surface-sunken);border-radius:4px;padding:1px 5px}
+b.warn{color:var(--dt-warning)}
+b.bad{color:var(--dt-danger)}
+b.good{color:var(--dt-success)}
+.small{font-size:12px;color:var(--dt-text-muted)}
+.tiny{font-size:11.5px;color:var(--dt-text-subtle)}
+
+table.t{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 4px}
+table.t th{background:var(--dt-surface-alt);color:var(--dt-text-subtle);font-size:11px;
+           font-weight:700;text-align:left;padding:8px 10px;border-bottom:1px solid var(--dt-border)}
+table.t td{padding:7px 10px;border-bottom:1px solid var(--dt-border-faint);vertical-align:top}
+table.t tr:nth-child(even) td{background:var(--dt-row-alt)}
+table.t td.n{font-family:var(--mono);white-space:nowrap}
+table.t .ok{color:var(--dt-success);font-weight:700}
+table.t .no{color:var(--dt-danger);font-weight:700}
+.pass{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px}
+.pass.g{background:#eaf6ef;color:var(--dt-success)}
+.pass.r{background:var(--dt-danger-soft);color:var(--dt-danger)}
+.pass.y{background:var(--dt-warning-soft);color:var(--dt-warning)}
+
+.ic{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6px;
+    stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
+.ic-16{width:16px;height:16px}
+.ic-12{width:12px;height:12px}
+
+/* ============================================================
+   1:1 画布 —— 1266 × 763（窗口真实尺寸）
+   行高由 grid-template-rows 精确给定，右侧标尺用同一套模板，
+   因此标尺刻度与画布区域严格对齐。
+   ============================================================ */
+.stage{display:flex;align-items:flex-start;margin:10px 0 6px}
+.win{position:relative;flex:none;width:1266px;height:763px;background:var(--dt-content-bg);
+     overflow:hidden;outline:1px solid var(--dt-border);
+     font-family:var(--ui);font-size:13px;line-height:1.45;color:var(--dt-text)}
+.ruler{flex:none;width:286px;margin-left:16px;display:grid}
+.ruler>div{position:relative;border-top:1px solid var(--dt-segmented-edge);
+           font-size:11px;color:var(--dt-text-subtle);padding:1px 0 0 9px;overflow:hidden}
+.ruler>div.gap{border-top:1px dashed #e6eaef;color:#b3bac4}
+.ruler .h{font-family:var(--mono);font-weight:700;color:var(--dt-text-muted);font-size:11px}
+.ruler .note{color:var(--dt-text-subtle);display:block;line-height:1.35;font-family:var(--ui)}
+.ruler .key{color:var(--dt-accent)}
+.ruler .tag{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;
+            background:var(--dt-accent);color:#fff;border-radius:999px;padding:0 5px;
+            font-family:var(--mono);font-size:10.5px;font-weight:700;margin-right:4px}
+.ruler .an{display:block;color:#3c424a;font-size:11px;line-height:1.45;margin-top:3px}
+.ruler .an.q{color:var(--dt-warning)}
+.ruler .warnn{color:var(--dt-warning)}
+
+/* 画布行模板 */
+.rowsA{grid-template-rows:85px 16px 48px 36px 8px 32px 14px 312px 14px 36px 14px 132px 16px}
+.rowsB{grid-template-rows:85px 16px 48px 46px 14px 36px 14px 488px 16px}
+
+.main{position:absolute;left:267px;top:0;width:988px;height:763px;display:grid}
+.main>div{min-width:0}
+.pad{padding:0 24px}
+.scrollv{position:absolute;left:1255px;top:85px;width:11px;height:661px;background:transparent}
+.scrollv i{position:absolute;left:4px;width:4px;border-radius:3px;background:var(--dt-scrollbar)}
+
+/* ---- 侧边栏（上下文，非本轮改动） ---- */
+.sb{position:absolute;left:0;top:0;width:267px;height:763px;background:var(--dt-canvas);
+    border-right:1px solid var(--dt-border);padding:16px 12px}
+.sb-brand{display:flex;align-items:center;gap:9px;padding:2px 6px 16px}
+.sb-logo{width:28px;height:28px;border-radius:9px;background:var(--dt-accent);
+         display:flex;align-items:center;justify-content:center;color:#fff}
+.sb-name{font-size:16px;font-weight:700;line-height:1.2}
+.sb-sub{font-size:11px;color:var(--dt-text-subtle);line-height:1.2}
+.sb-all{height:34px;border-radius:6px;display:flex;align-items:center;gap:8px;
+        padding:0 8px;font-size:13px}
+.sb-all.on{background:var(--dt-accent-soft);box-shadow:inset 3px 0 0 var(--dt-accent);color:var(--dt-accent);font-weight:700}
+.sb-all .cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--dt-text-subtle)}
+.sb-search{height:36px;border-radius:8px;background:var(--dt-surface);
+           border:1px solid var(--dt-segmented-edge);margin:10px 0 16px;
+           display:flex;align-items:center;gap:8px;padding:0 10px;color:var(--dt-text-subtle);font-size:12.5px}
+.sb-cap{font-size:11px;color:var(--dt-text-subtle);font-weight:700;padding:0 8px 6px}
+.sb-item{height:32px;border-radius:6px;display:flex;align-items:center;gap:8px;
+         padding:0 8px;font-size:13px;color:var(--dt-text)}
+.sb-item.on{background:var(--dt-surface-hover)}
+.sb-item.leaf{padding-left:26px;font-size:12.5px;color:var(--dt-text-muted)}
+.sb-item .cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--dt-text-subtle)}
+
+/* ---- 详情页头（外壳，本轮不动） ---- */
+.pgh{background:var(--dt-surface);border-bottom:1px solid var(--dt-border);padding:16px 24px 14px}
+.pgh-row{display:flex;align-items:center;gap:12px;height:32px}
+.pgh-back{height:30px;border-radius:7px;border:1px solid var(--dt-border-strong);
+          background:var(--dt-surface);display:flex;align-items:center;gap:6px;
+          padding:0 10px;font-size:12.5px;color:var(--dt-text-muted)}
+.pgh-title{font-size:23px;font-weight:700;letter-spacing:0}
+.pgh-desc{font-size:12.5px;color:var(--dt-text-muted);margin-top:5px}
+
+/* ---- 业务页签行 48（原：按钮独占一行 32 + 间距 16 + 页签头 64 = 112） ---- */
+.bizrow{display:flex;align-items:center;padding:0 24px}
+.seg{height:38px;background:var(--dt-segmented-track);border:1px solid var(--dt-segmented-edge);
+     border-radius:9px;padding:3px;display:flex;gap:2px}
+.seg>span{height:32px;border-radius:7px;padding:0 14px;display:flex;align-items:center;
+          font-size:13.5px;color:var(--dt-text-muted)}
+.seg>span.on{background:var(--dt-segmented-thumb);font-weight:700;color:var(--dt-text);
+             box-shadow:0 1px 2px rgba(22,24,29,.06)}
+.btn{height:32px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;
+     padding:0 12px;font-size:13px;border:1px solid var(--dt-border-strong);
+     background:var(--dt-surface);color:var(--dt-text);white-space:nowrap}
+.btn.quiet{border:none;background:transparent;color:var(--dt-accent);padding:0 8px}
+.btn.primary{background:var(--dt-accent);border-color:var(--dt-accent);color:#fff;font-weight:700}
+.reqrow .btn,.reqrow .sel{height:36px}
+.btn.sm{height:28px;border-radius:7px;font-size:12.5px;padding:0 9px}   /* 紧凑档 28 */
+.spacer{flex:1 1 auto;min-width:8px}
+
+/* ---- 请求行 36 + 说明行 32 ---- */
+.reqrow{display:flex;gap:8px;align-items:center;padding:0 24px}
+.sel{height:36px;border-radius:8px;border:1px solid var(--dt-border-strong);
+     background:var(--dt-surface);display:flex;align-items:center;padding:0 10px;
+     font-size:13px;gap:8px}
+.sel.mono{font-family:var(--mono);font-size:13px}
+.sel .cv{margin-left:auto;color:var(--dt-text-subtle)}
+.inp{height:36px;border-radius:8px;border:1px solid var(--dt-border-strong);
+     background:var(--dt-surface);display:flex;align-items:center;padding:0 12px;
+     font-family:var(--mono);font-size:13px;color:var(--dt-text);overflow:hidden;white-space:nowrap}
+.hintrow{display:flex;align-items:center;gap:8px;padding:0 24px;font-size:12px;color:var(--dt-text-muted)}
+.spin{width:64px;height:32px;border-radius:8px;border:1px solid var(--dt-border-strong);
+      background:var(--dt-surface);display:flex;align-items:center;padding:0 4px 0 9px;
+      font-family:var(--mono);font-size:13px}
+.spin .arw{margin-left:auto;display:flex;flex-direction:column;color:var(--dt-text-subtle);line-height:0}
+
+/* ---- 内层页签（文字 + 2px 下划线） ---- */
+/* 内层页签不带外框：真实页面里页签头与工具行直接落在内容底（-dt-content-bg）上，
+   只有键值表是一张白卡。加外框会让每段行高凭空少 2px（border 吃掉），
+   而且视觉上会变成「卡里的卡」。 */
+.tabs{display:flex;flex-direction:column;background:transparent}
+.tabhead{height:56px;display:flex;align-items:center;gap:4px;padding:0 8px;
+         border-bottom:1px solid var(--dt-border);flex:none}
+.tabhead>span{height:30px;display:flex;align-items:center;padding:0 12px;font-size:13.5px;
+              color:var(--dt-text-muted);white-space:nowrap}
+.tabhead>span.on{font-weight:700;color:var(--dt-text);box-shadow:inset 0 -2px 0 var(--dt-accent)}
+/* 页签正文不加左右内边距：实测现状里 Params 表就是 940 满宽（x=291 w=940），
+   加 padding 会让表格宽度凭空少 32px，与真实渲染对不上。 */
+.tabbody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:0}
+
+/* ---- Body 工具行 38（分段轨道档）---- */
+.toolrow{height:38px;display:flex;align-items:center;gap:10px;flex:none}
+.segb{height:38px;background:var(--dt-segmented-track);border:1px solid var(--dt-segmented-edge);
+      border-radius:9px;padding:3px;display:flex;gap:2px;flex:none}
+.segb>span{height:32px;border-radius:7px;padding:0 12px;display:flex;align-items:center;
+           font-size:13px;color:var(--dt-text-muted);white-space:nowrap}
+.segb>span.on{background:var(--dt-segmented-thumb);font-weight:700;color:var(--dt-text);
+              box-shadow:0 1px 2px rgba(22,24,29,.06)}
+.ctype{font-family:var(--mono);font-size:11.5px;color:var(--dt-text-subtle);
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ctype.conflict{font-family:var(--ui);font-size:12px;color:var(--dt-warning);
+                display:flex;align-items:center;gap:5px}
+
+/* ---- 键值表 40 表头 / 34 行 ---- */
+.kv{background:var(--dt-surface);border:1px solid var(--dt-border);border-radius:9px;
+    overflow:hidden;display:flex;flex-direction:column;padding:1px}
+/* 放进页签正文时就是一张白卡，与 .kv-table 的真实实现同构：
+   外框 940 → 减 1px 边框 + 1px 内边距 → 列宽可用 936。 */
+.kv.bare{border:1px solid var(--dt-border);border-radius:9px}
+.kvh{height:40px;display:flex;align-items:center;background:var(--dt-surface-alt);
+     border-bottom:1px solid var(--dt-border);flex:none}
+.kvh>span{font-size:11px;font-weight:700;color:var(--dt-text-subtle);padding:0 10px}
+.kvrow{height:34px;display:flex;align-items:center;border-bottom:1px solid var(--dt-border-faint);
+       font-size:12.5px}
+.kvrow.alt{background:var(--dt-row-alt)}
+.kvrow>span{padding:0 10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.c-chk{flex:none;display:flex;align-items:center;justify-content:center;padding:0!important}
+.cb{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--dt-border-strong);
+    background:var(--dt-surface);display:inline-flex;align-items:center;justify-content:center}
+.cb.on{background:var(--dt-accent);border-color:var(--dt-accent);color:#fff}
+.cb.part{border-color:var(--dt-accent);background:var(--dt-accent-soft)}
+.kvm{font-family:var(--mono);font-size:12.5px}
+.kvrow .muted{color:var(--dt-text-subtle)}
+
+/* 文件选择单元格 */
+.filecell{display:flex;align-items:center;gap:8px;padding:0 10px;overflow:hidden}
+.filecell .pick{height:26px;border-radius:7px;border:1px solid var(--dt-border-strong);
+                background:var(--dt-surface);display:inline-flex;align-items:center;gap:5px;
+                padding:0 9px;font-size:12.5px;white-space:nowrap;flex:none;color:var(--dt-text)}
+.filecell .fpath{font-family:var(--mono);font-size:12px;color:var(--dt-text);
+                 overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filecell .fsize{font-family:var(--mono);font-size:11.5px;color:var(--dt-text-muted);flex:none}
+.filecell .fdel{color:var(--dt-text-subtle);flex:none;display:flex}
+.filecell .fmiss{color:var(--dt-danger);font-size:11.5px;flex:none}
+.kvend{height:34px;display:flex;align-items:center;padding:0 10px;font-size:12.5px;
+       color:var(--dt-text-subtle)}
+
+/* ---- 文本区 ---- */
+.ta{flex:1 1 auto;min-height:0;border:1px solid var(--dt-border-strong);border-radius:8px;
+    background:var(--dt-surface);font-family:var(--mono);font-size:12.5px;line-height:18px;
+    padding:8px 10px;overflow:hidden;white-space:pre;color:var(--dt-text)}
+.ta .k{color:#1d4fd7;font-weight:700}
+.ta .s{color:#167a4a}
+
+/* ---- 空态 ---- */
+.empty{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+       align-items:center;justify-content:center;gap:7px;color:var(--dt-text-subtle);text-align:center}
+.empty .et{font-size:13px;color:var(--dt-text-muted)}
+.empty .eh{font-size:12px;color:var(--dt-text-subtle)}
+
+/* ---- 响应工具行 36 ---- */
+.respbar{display:flex;align-items:center;gap:16px;padding:0 24px}
+.badge{display:inline-flex;align-items:center;gap:6px;height:24px;border-radius:7px;
+       padding:0 9px;font-size:12.5px;font-weight:700;
+       background:#eaf6ef;color:var(--dt-success)}
+.badge.red{background:var(--dt-danger-soft);color:var(--dt-danger)}
+.metric{font-family:var(--mono);font-size:12.5px;color:var(--dt-text-muted)}
+.respbar .note{font-size:12px;color:var(--dt-text-subtle)}
+
+/* ---- 折叠摘要条 46 ---- */
+.strip{height:46px;background:var(--dt-surface);border:1px solid var(--dt-border);
+       border-radius:11px;display:flex;align-items:center;gap:10px;padding:0 14px}
+.strip .verb{height:22px;border-radius:6px;background:var(--dt-accent-soft);color:var(--dt-accent);
+             font-family:var(--mono);font-size:12px;font-weight:700;display:flex;
+             align-items:center;padding:0 8px;flex:none}
+.strip .u{font-family:var(--mono);font-size:12.5px;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0}
+.strip .meta{font-size:12px;color:var(--dt-text-subtle);flex:none}
+
+/* ---- 标注 chip（只出现在画布内侧空白处，不遮挡内容） ---- */
+.anno{position:absolute;display:inline-flex;align-items:center;gap:5px;height:22px;
+      border-radius:999px;padding:0 9px;font-size:11px;font-weight:700;
+      background:var(--dt-accent);color:#fff;box-shadow:0 2px 8px rgba(22,24,29,.18);
+      white-space:nowrap;z-index:5}
+.anno.gray{background:#5a6169}
+.anno .num{background:rgba(255,255,255,.24);border-radius:999px;padding:0 5px;font-family:var(--mono)}
+
+/* ---- 组件细节（放大） ---- */
+.zoom{background:#fff;border:1px dashed var(--dt-border-strong);border-radius:10px;
+      padding:16px 14px 26px;overflow-x:auto}
+.z4{zoom:4}
+.z3{zoom:3}
+.z4 .segb,.z4 .toolrow,.z4 .kv,.z4 .strip,.z4 .respbar,.z4 .bizrow{width:940px;padding-left:0!important;padding-right:0!important}
+.z4 .segb{padding:3px!important}
+.callouts{display:flex;gap:22px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--dt-text-muted)}
+.callouts div{display:flex;align-items:center;gap:6px}
+.mk{font-family:var(--mono);font-weight:700;color:var(--dt-accent)}
+
+/* ---- 问题卡 ---- */
+.q{border:1px solid var(--dt-border);border-left:3px solid var(--dt-accent);border-radius:8px;
+   padding:12px 14px;margin:0 0 12px;background:var(--dt-surface-alt)}
+.q .qh{font-weight:700;font-size:13px;margin-bottom:4px}
+.q ul{margin:6px 0 6px 18px;padding:0}
+.q li{margin:3px 0;font-size:12.5px}
+.q.qw{border-left-color:var(--dt-warning)}
+.q.qd{border-left-color:var(--dt-danger)}
+.foot{margin-top:26px;font-size:12px;color:var(--dt-text-subtle);text-align:center}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13.5 12 18.5l9-5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.2"/><path d="M20 20l-4.2-4.2"/></symbol>
+    <symbol id="i-aleft" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></symbol>
+    <symbol id="i-aright" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-cd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-cr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M13.5 3H7.5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M13.5 3v5h5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.4l2 2.4h7.6a2 2 0 0 1 2 2v8.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-11Z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7.5"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 2.6 20h18.8L12 4Z"/><path d="M12 10v4.4M12 17.4v.2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.4M12 7.6v.2"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M15 7l5 5-5 5"/></symbol>
+    <symbol id="i-hash" viewBox="0 0 24 24"><path d="M9 4 7 20M17 4l-2 16M4 9h16M3 15h16"/></symbol>
+    <symbol id="i-lines" viewBox="0 0 24 24"><path d="M4 6h16M4 12h11M4 18h14"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></symbol>
+    <symbol id="i-brackets" viewBox="0 0 24 24"><path d="M8.5 3.5H6.2v17h2.3M15.5 3.5h2.3v17h-2.3"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M6 13l6 6 6-6"/></symbol>
+    <symbol id="i-slash" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M6.2 6.2l11.6 11.6"/></symbol>
+  </defs>
+</svg>
+
+<div class="doc">
+
+<h1>HTTP 单一请求页 · 重设计评审 v1</h1>
+<p class="lead">范围：<code>features/http/SingleRequestPanel</code>（单一请求页的请求配置与响应区）、
+它用到的 <code>KeyValueTable</code>，以及 <code>HttpRequestSpec.BodyType</code> / <code>HttpEngine</code> 的请求体通路。
+批处理页（<code>BatchPanel</code>）本身不在本轮范围内，但 <code>BodyType</code> 与 <code>HttpEngine</code> 是两个页签共用的 ——
+请求体类型的扩充会同时改变批处理页的行为，这一点在 §13 列为待拍板项。</p>
+
+<section class="block">
+<h2><span class="idx">00</span>审阅信息</h2>
+<table class="t">
+<tr><th style="width:180px">项</th><th>值</th></tr>
+<tr><td>画布尺寸</td><td class="n">1266 × 763（窗口真实尺寸，与 <code>DESIGN.md</code> §8 的验收尺寸一致）</td></tr>
+<tr><td>内宽口径</td><td class="n">侧边栏 267 → 内容区 999 → 竖滚动条 11 → 视口内容 988 → 左右留白 24×2 → <b>可用内宽 940</b></td></tr>
+<tr><td>测量口径</td><td>全部数值来自运行态探针 <code>target/design-measure/Measure.java</code>：真实窗口 + 真实 <code>app.css</code> + 真实 <code>HttpEngine</code> 发起真实 socket 请求。不读源码声明判 PASS，也不目测截图</td></tr>
+<tr><td>状态</td><td><span class="pass y">待审核 v1</span>　本文件只是设计评审稿，<b>未改动任何产品代码</b></td></tr>
+<tr><td>已知缺口</td><td>820×560 窄窗为<b>计算值</b>，未做逐像素验证（§12），按未执行处理。其余全部数值来自真实浏览器实测（§13）</td></tr>
+</table>
+</section>
+
+<section class="block">
+<h2><span class="idx">01</span>诊断：为什么现在「粗糙」</h2>
+
+<p><b>一句话结论：</b>请求体区把 <b>5 种语义完全不同的请求体</b>压在了同一个 <code>TextArea</code> 上 ——
+那个「类型」下拉只改变编辑区的不透明度，<b>不改变编辑器的形态</b>。于是 Form 只能手写
+<code>a=1&amp;b=2</code>（而且并不编码），文件上传则根本不存在。</p>
+
+<p>探针把这句话量成了事实：逐个选中 5 种类型，Body 页签内 <b>TableView 数量恒为 0、TextArea 数量恒为 1</b>，
+不透明度只有 <code>NONE</code> 一档从 1.00 变 0.42。也就是说除「变淡」以外，切换类型<b>没有产生任何界面变化</b>。</p>
+
+<h3>1.1 缺陷清单（每条都有运行态证据）</h3>
+<table class="t">
+<tr><th style="width:34px">#</th><th style="width:210px">现象</th><th style="width:430px">证据（探针实测）</th><th>本轮处置</th></tr>
+
+<tr><td class="n">D1</td><td>切换请求体类型，输入形态不变</td>
+<td class="n">NONE/JSON/FORM/TEXT/XML 五档下：TableView=0、TextArea=1，不透明度 0.42 / 1.00 / 1.00 / 1.00 / 1.00</td>
+<td>按类型换编辑器（§03）</td></tr>
+
+<tr><td class="n">D2</td><td>Form 没有键值输入，只能手写一行字符串</td>
+<td class="n">Body 页签内键值表数量 = 0</td>
+<td>Form / Form-data 改为键值表（§03）</td></tr>
+
+<tr><td class="n">D3</td><td>界面写着「Form 会自动编码键值」，实际不编码</td>
+<td class="n">送进去 <code>城市=北京 上海&amp;n=1</code> → 服务端收到 <code>城市=北京 上海&amp;n=1</code>（原样）<br>
+<code>HttpEngine</code> 走 <code>BodyPublishers.ofString</code>；<code>URLEncoder</code> 只用在 query 参数上</td>
+<td>文案改对 + 键值表按 RFC 3986 编码（§03）</td></tr>
+
+<tr><td class="n">D4</td><td>完全无法上传文件</td>
+<td class="n">可选类型 = <code>[NONE, JSON, FORM, TEXT, XML]</code>，其中含 multipart = <b>否</b></td>
+<td>新增 <code>Form-data</code>（multipart）与 <code>Binary</code>（§03）</td></tr>
+
+<tr><td class="n">D5</td><td>请求头里的 Content-Type 与请求体类型可以自相矛盾，且不提示</td>
+<td class="n">类型=FORM + 头里塞 <code>Content-Type: application/json</code> → 实际发出头 <code>application/json</code>、体 <code>a=1</code></td>
+<td>工具行常驻实际 Content-Type；冲突时转警告色 + 图标 + 文字（§03 守卫①）</td></tr>
+
+<tr><td class="n">D6</td><td>GET 带请求体，界面不提示</td>
+<td class="n">GET + JSON 体 → <code>status=200</code>（JDK 不拦，原样发出；服务端确实收到了 <code>{"a":1}</code>，<code>elapsedMs</code> 正常）</td>
+<td>工具行给信息级提示（不阻断）</td></tr>
+
+<tr><td class="n">D7</td><td>Params 的 <code>DESCRIPTION</code> 列恒空且不可编辑，却吃掉 245px</td>
+<td class="n">列宽 38 / 299 / 354 / <b>245</b>；<code>cellValueFactory</code> 恒返回空串，且未设 <code>cellFactory</code> → 点了打不进字</td>
+<td>删除该列，宽度还给 KEY / VALUE</td></tr>
+
+<tr><td class="n">D8</td><td>键值表只看得见 3.3 行</td>
+<td class="n">表格高 152 = 表头 40 + 表体 112 → 112 ÷ 34 = 3.3</td>
+<td>请求页签 248 → 312 → 表体 <b>170 = 5 行</b></td></tr>
+
+<tr><td class="n">D9</td><td>请求体文本区只看得见约 6 行</td>
+<td class="n">编辑区 127px；其上还有 32 工具栏 + 8 间距 + 15 说明，全塞在固定的 192 正文里</td>
+<td>编辑器 210px（≈11 行），说明并入工具行</td></tr>
+
+<tr><td class="n">D10</td><td>「格式化」按钮在任何类型下都在，点了没反应</td>
+<td class="n">Body 页签内 Button 数量恒为 1；非 JSON 时 <code>JsonParser</code> 抛的异常被空 <code>catch</code> 吃掉</td>
+<td>只在 JSON 下出现（§08 细节 ③）</td></tr>
+
+<tr><td class="n">D11</td><td>类型下拉直接把枚举名给用户看</td>
+<td class="n">下拉项 = <code>[NONE, JSON, FORM, TEXT, XML]</code> —— 全大写枚举名，且 FORM 没有键值、TEXT 与 FORM 的差别无从判断</td>
+<td>改为分段控件 + 技术术语 <code>无 / JSON / Form / Form-data / XML / Text / Binary</code></td></tr>
+
+<tr><td class="n">D12</td><td>方法只有 4 个，缺 PATCH</td>
+<td class="n">方法下拉共 4 项 <code>[GET, POST, PUT, DELETE]</code></td>
+<td>补 <code>PATCH</code>（HEAD / OPTIONS 见 §13 Q4）</td></tr>
+
+<tr><td class="n">D13</td><td><b>响应区被挤到首屏之外</b>（结构性问题）</td>
+<td class="n">面板自然高 701，视口 678 里已被 chrome 占掉 134（留白 22 + 按钮行 32 + 间距 16 + 业务页签头 64），
+可用只剩 544 → 溢出 <b>157px</b>，外层滚动条常驻</td>
+<td>chrome 134 → 64；请求页签 248 → 312；响应区「配置态保底 / 查看态吃满」两段式（§02 / §06）</td></tr>
+</table>
+
+<h3 class="sub">1.2 chrome 账本：一屏 763px 里，内容开始之前花掉了多少</h3>
+<table class="t">
+<tr><th>层级</th><th style="width:110px">现状</th><th style="width:110px">改后</th><th>说明</th></tr>
+<tr><td>详情页头（返回 + 标题 + 面包屑）</td><td class="n">85</td><td class="n">85</td><td>外壳，本轮不动（压在 §13 Q6）</td></tr>
+<tr><td>模块正文上下留白</td><td class="n">22 + 26</td><td class="n">16 + 16</td><td><code>.module-body</code> padding，收紧一档</td></tr>
+<tr><td>「用当前请求作为批处理模板」按钮行</td><td class="n">32 + 16</td><td class="n">0</td><td>并入业务页签行右侧（批处理页改版已确立同一做法）</td></tr>
+<tr><td>业务页签带（单一请求 / 批处理）</td><td class="n">64</td><td class="n">48</td><td>上下内边距 16 → 8</td></tr>
+<tr><td><b>视口内 chrome 合计</b></td><td class="n"><b>134</b></td><td class="n"><b>64</b></td><td>省下 70px，全部给内容</td></tr>
+</table>
+<p class="small">改后表体可用高 = 678 − 64 = <b>598</b>（原 544）。这是 §02 面积预算的分母。</p>
+</section>
+
+<section class="block">
+<h2><span class="idx">02</span>面积预算：每一像素都要有归属</h2>
+
+<p>请求配置区与响应区在 598px 里抢空间，而两者的<b>需求量差 3 倍</b>（配置约 396，响应想看 25 行以上）。
+把两边都钉死必然有一方受害 —— 这正是批处理页当初的病（固定比例 0.46 对活着的最小高度）。
+因此这里用「<b>一个区域可折叠 + 另一个区域 grow 保底</b>」，不使用任何固定比例。</p>
+
+<div class="stage">
+<div>
+<h3 class="sub" style="margin-top:0">状态 A · 配置态（未发送 / 手动展开）—— 加总严格 = 763</h3>
+<table class="t">
+<tr><th>区域</th><th style="width:80px">px</th><th>依据</th></tr>
+<tr><td>详情页头</td><td class="n">85</td><td>16 + 标题行 32 + 间距 7 + 说明 16 + 14</td></tr>
+<tr><td>模块正文上留白</td><td class="n">16</td><td><code>.module-body</code></td></tr>
+<tr><td>业务页签行</td><td class="n">48</td><td>分段轨 32 + 上下各 8；按钮（32）在同一条右侧</td></tr>
+<tr><td>请求行（方法 / 地址 / Send）</td><td class="n">36</td><td>强调档 36</td></tr>
+<tr><td>间距</td><td class="n">8</td><td>同组控件之间</td></tr>
+<tr><td>超时 + 占位符说明行</td><td class="n">32</td><td>数字框 32</td></tr>
+<tr><td>间距</td><td class="n">14</td><td>区块之间</td></tr>
+<tr><td>请求页签（Params / Headers / Body）</td><td class="n">312</td><td>页签头 56 + 正文 256；正文 = 工具行 38 + 8 + 编辑器 210</td></tr>
+<tr><td>间距</td><td class="n">14</td><td></td></tr>
+<tr><td>响应工具行</td><td class="n">36</td><td>状态徽标 24 + 上下各 6</td></tr>
+<tr><td>间距</td><td class="n">14</td><td></td></tr>
+<tr><td>响应页签（保底）</td><td class="n">132</td><td>页签头 56 + 内容 76（一个完整空态 65：图标 22 + 7 + 主文案 17 + 4 + 次文案 15，上下各留 5）</td></tr>
+<tr><td>模块正文下留白</td><td class="n">16</td><td></td></tr>
+<tr><td><b>合计</b></td><td class="n"><b>763</b></td><td><b>等于视口高 → 外层不出现滚动条</b></td></tr>
+</table>
+</div>
+<div class="ruler" style="grid-template-rows:85px 16px 48px 36px 8px 32px 14px 312px 14px 36px 14px 132px 16px;margin-top:44px;height:763px">
+  <div class="h">85<span class="note">详情页头（外壳）</span></div>
+  <div class="gap">16</div>
+  <div class="h">48<span class="note">业务页签行<br>原 112 = 按钮行 32+16 + 页签头 64</span></div>
+  <div class="h">36<span class="note">请求行 · 强调档 36</span></div>
+  <div class="gap">8</div>
+  <div class="h">32<span class="note">超时 / 占位符说明</span></div>
+  <div class="gap">14</div>
+  <div class="h key">312<span class="note">请求页签<br>原 248 → 表体 3.3 行<br>现 312 → 表体 <b>5.0 行</b></span></div>
+  <div class="gap">14</div>
+  <div class="h">36<span class="note">响应工具行<br>原 50 + 页签内 42 = 92</span></div>
+  <div class="gap">14</div>
+  <div class="h">132<span class="note">响应页签保底<br>空态 65，居中</span></div>
+  <div class="gap">16</div>
+</div>
+</div>
+
+<div class="stage" style="margin-top:26px">
+<div>
+<h3 class="sub" style="margin-top:0">状态 B · 查看态（发送后自动折叠请求配置）—— 加总严格 = 763</h3>
+<table class="t">
+<tr><th>区域</th><th style="width:80px">px</th><th>依据</th></tr>
+<tr><td>详情页头</td><td class="n">85</td><td>不变</td></tr>
+<tr><td>模块正文上留白</td><td class="n">16</td><td></td></tr>
+<tr><td>业务页签行</td><td class="n">48</td><td></td></tr>
+<tr><td>请求摘要条（折叠）</td><td class="n">46</td><td>方法徽标 22 + 上下各 12</td></tr>
+<tr><td>间距</td><td class="n">14</td><td></td></tr>
+<tr><td>响应工具行</td><td class="n">36</td><td></td></tr>
+<tr><td>间距</td><td class="n">14</td><td></td></tr>
+<tr><td>响应页签（grow）</td><td class="n">488</td><td>页签头 56 + 内容 <b>432</b> → 432 ÷ 18 ≈ <b>24 行</b>文本（现状 187px ≈ 10 行）</td></tr>
+<tr><td>模块正文下留白</td><td class="n">16</td><td></td></tr>
+<tr><td><b>合计</b></td><td class="n"><b>763</b></td><td></td></tr>
+</table>
+<p class="small">折叠发生在按下 Send 的瞬间（不是等响应回来），这样「请求中…」也直接出现在被放大的响应区里。
+摘要条右侧有「展开编辑」与「重发」两个按钮 —— 后者是本页唯一的主色实底，因为在这一屏里「再发一次」才是用户的主动作。回到状态 A，填过的参数一个都不丢。</p>
+</div>
+<div class="ruler" style="grid-template-rows:85px 16px 48px 46px 14px 36px 14px 488px 16px;margin-top:44px;height:763px">
+  <div class="h">85</div>
+  <div class="gap">16</div>
+  <div class="h">48</div>
+  <div class="h key">46<span class="note">请求摘要条<br>方法 · 最终 URL · 请求体摘要 · [展开编辑]</span></div>
+  <div class="gap">14</div>
+  <div class="h">36</div>
+  <div class="gap">14</div>
+  <div class="h key">488<span class="note">响应页签<br>内容 432 ≈ <b>24 行</b><br>（现状 187px ≈ 10 行）</span></div>
+  <div class="gap">16</div>
+</div>
+</div>
+
+<p class="small" style="margin-top:18px"><b>保底值口径</b>：响应区保底 132 是<b>设计目标</b>，不是「能接受的最低值」。
+它由 56（页签头）+ 76（一个完整空态）反推而来。把保底值写在目标之上只会增加脆弱性。</p>
+</section>
+
+<section class="block">
+<h2><span class="idx">03</span>核心改动：类型 → 编辑器</h2>
+
+<p>「类型」是一个<b>模式开关</b>，不是取值 —— 所以它从下拉框改成<b>分段控件</b>：全部选项一眼可见、一次点击直达、
+不用经历「展开 → 找 → 选」。右端留一个固定宽度的动作槽，只放<b>当前类型真的可用</b>的动作（这是 D10 的反面：不给假按钮）。
+槽左侧常驻<b>实际会发出去的 Content-Type</b>，等宽小字 —— 比起让用户切到「请求详情」页签里翻，把它放在类型旁边才有用。</p>
+
+<table class="t">
+<tr><th style="width:110px">类型</th><th style="width:250px">Content-Type</th><th>编辑器</th><th style="width:130px">右端动作槽</th></tr>
+<tr><td class="n">无</td><td class="n">（不发送请求体）</td>
+<td>空态：<code>slash-circle</code> 图标 + 「本次请求不带请求体」。若内部仍保留着上一次的 JSON，附一句「已保留 JSON 内容，切回即恢复」</td><td class="n">—</td></tr>
+
+<tr><td class="n">JSON</td><td class="n">application/json</td>
+<td>等宽文本区，约 11 行；占位符示例 <code>{"orderId": "{orderId}"}</code></td>
+<td class="n">[格式化 / 压缩]</td></tr>
+
+<tr><td class="n">Form</td><td class="n">application/x-www-form-urlencoded</td>
+<td><b>键值表</b>：勾选 38 / KEY 弹性 / VALUE 弹性，尾行留空。5 行可见</td>
+<td class="n">[清空]</td></tr>
+
+<tr><td class="n"><b>Form-data</b><br><span class="tiny">新增</span></td><td class="n">multipart/form-data; boundary=…</td>
+<td><b>键值表 + 逐行类型</b>：勾选 38 / KEY 216 / 类型 76 / VALUE 606（合计 936）。<br>
+类型 = 文本 → VALUE 是输入框；类型 = 文件 → VALUE 是「[选择文件] 路径 大小 [×]」。5 行可见</td>
+<td class="n">[清空]</td></tr>
+
+<tr><td class="n">XML</td><td class="n">application/xml</td>
+<td>等宽文本区，约 11 行</td><td class="n">—</td></tr>
+
+<tr><td class="n">Text</td><td class="n">text/plain</td>
+<td>等宽文本区，约 11 行</td><td class="n">—</td></tr>
+
+<tr><td class="n">Binary<br><span class="tiny">新增</span></td><td class="n">application/octet-stream</td>
+<td>单文件选择器：<code>[选择文件]</code> + 路径 + 大小 + 清除；下方一行等宽元信息（文件名 · 字节数）</td>
+<td class="n">[更换]</td></tr>
+</table>
+
+<h3 class="sub">3.1 两条必须一起做的守卫（否则「支持文件」只是半个功能）</h3>
+<div class="q qw">
+<div class="qh">守卫 ①　Content-Type 一致性</div>
+<p class="small" style="margin:0">请求头表里若已存在与当前类型冲突的 Content-Type，工具行右端由「等宽 Content-Type」切换为
+<b class="warn"><svg class="ic ic-12" style="vertical-align:-1px"><use href="#i-warn"/></svg>
+请求头里已设 Content-Type: application/json，与当前类型 Form 不一致，将按请求头发送</b>。
+<b>不自动改用户的头</b>（自己改了更难排查），只把事实说出来。这是 D5 的闭环。</p>
+</div>
+<div class="q">
+<div class="qh">守卫 ②　方法 × 请求体</div>
+<p class="small" style="margin:0">当前实现里 <code>inferBodyType</code> 会在「类型=无 但编辑区有内容」时<b>静默</b>按内容形状改类型再发出去。
+静默推断要保留（它是防止「粘完 JSON 忘了改下拉框」的安全网），但必须<b>说出来</b>：工具行右端显示
+<b>本次按 JSON 发送（类型选了「无」，编辑区有内容）</b>。同理，<code>GET</code> 下有非空请求体时给一条信息级提示 ——
+实测 JDK 会真的把它发出去，服务端行为不可预期，所以提示但不阻断。</p>
+</div>
+</section>
+
+<section class="block">
+<h2><span class="idx">04</span>图 A · 配置态：Params 页签（1266 × 763，1:1）</h2>
+<p class="small">键值表从 3.3 行提到 5 行；<code>DESCRIPTION</code> 死列删除，腾出的 245px 还给 KEY / VALUE。
+列宽：外框 940 − 边框 2 − 内边距 2 → 可用 936；勾选 38 / KEY 340 / VALUE 558（现状是 38 / 299 / 354 / <b>245</b>）。</p>
+
+<div class="stage">
+<div class="win">
+  <div class="sb">
+    <div class="sb-brand">
+      <div class="sb-logo"><svg class="ic ic-16"><use href="#i-layers"/></svg></div>
+      <div><div class="sb-name">ToolNest</div><div class="sb-sub">工具巢</div></div>
+    </div>
+    <div class="sb-all"><svg class="ic"><use href="#i-layers"/></svg><span>所有工具</span><span class="cnt">11</span></div>
+    <div class="sb-search"><svg class="ic"><use href="#i-search"/></svg><span>搜索功能…</span></div>
+    <div class="sb-cap">功能分类</div>
+    <div class="sb-item"><svg class="ic"><use href="#i-globe"/></svg><span>转换类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-clock"/></svg><span>时间戳转换</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-code"/></svg><span>Cron 表达式解析</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>编码/解码类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>格式化类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-hash"/></svg><span>生成类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-lines"/></svg><span>文本处理类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item on"><svg class="ic"><use href="#i-globe"/></svg><span>网络请求工具</span><span class="cnt">1</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-globe"/></svg><span>HTTP 请求工具</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-file"/></svg><span>图片处理类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg><span>文件处理类型工具</span><span class="cnt">1</span></div>
+  </div>
+
+  <div class="main rowsA">
+    <div class="pgh">
+      <div class="pgh-row">
+        <div class="pgh-back"><svg class="ic"><use href="#i-aleft"/></svg>返回</div>
+        <div class="pgh-title">HTTP 请求工具</div>
+      </div>
+      <div class="pgh-desc">网络请求工具 › HTTP 请求工具</div>
+    </div>
+    <div></div>
+    <div class="bizrow">
+      <div class="seg"><span class="on">单一请求</span><span>批处理</span></div>
+      <div class="spacer"></div>
+      <div class="btn"><svg class="ic"><use href="#i-aright"/></svg>用当前请求作为批处理模板</div>
+    </div>
+    <div class="reqrow">
+      <div class="sel mono" style="width:124px">GET<span class="cv"><svg class="ic"><use href="#i-cd"/></svg></span></div>
+      <div class="inp" style="flex:1 1 auto"><span>https://api.example.com/order?id={orderId}</span></div>
+      <div class="btn primary" style="width:100px;justify-content:center">Send</div>
+    </div>
+    <div></div>
+    <div class="hintrow">
+      <span>超时（秒）</span>
+      <div class="spin">30<span class="arw"><svg class="ic ic-12"><use href="#i-up"/></svg><svg class="ic ic-12"><use href="#i-down"/></svg></span></div>
+      <div class="spacer"></div>
+      <span class="tiny">URL 与请求体中支持 {列名} 占位符，批处理时按 CSV 行替换。</span>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span class="on">Params (2)</span><span>Headers (3)</span><span>Body</span></div>
+        <div class="tabbody">
+          <div class="toolrow" style="padding:0 4px">
+            <span class="tiny">这些键值会以 query 参数拼到 URL 之后</span>
+            <div class="spacer"></div>
+            <div class="btn sm">清空</div>
+          </div>
+          <div style="height:8px"></div>
+          <div class="kv bare" style="height:210px">
+            <div class="kvh">
+              <span class="c-chk" style="width:38px"></span>
+              <span style="width:340px">KEY</span>
+              <span style="width:558px">VALUE</span>
+            </div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:340px">orderId</span><span class="kvm" style="width:558px">235027703726</span></div>
+            <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:340px">type</span><span class="kvm" style="width:558px">A</span></div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb"></i></span><span class="kvm muted" style="width:340px">channel</span><span class="kvm muted" style="width:558px">web</span></div>
+            <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:340px">trace</span><span class="kvm" style="width:558px">1</span></div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:340px"></span><span style="width:558px"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+    <div class="respbar">
+      <span class="badge"><svg class="ic ic-12"><use href="#i-check"/></svg>200 OK</span>
+      <span class="metric">128 ms</span>
+      <span class="metric">1.2 KB</span>
+      <div class="spacer"></div>
+      <span class="note">识别到 JSON 时自动高亮</span>
+      <div class="btn sm">格式化</div>
+      <div class="btn sm">清空响应</div>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span class="on">Body</span><span>响应头</span><span>请求详情</span></div>
+        <div class="tabbody">
+          <div class="empty">
+            <svg class="ic" style="width:22px;height:22px"><use href="#i-code"/></svg>
+            <div class="et">尚未发送请求</div>
+            <div class="eh">点「Send」后响应会显示在这里</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+  </div>
+
+  <div class="scrollv"><i style="top:0;height:180px"></i></div>
+</div>
+<div class="ruler rowsA" style="margin-top:0">
+  <div class="h">85<span class="note">详情页头</span></div>
+  <div class="gap">16</div>
+  <div class="h">48<span class="note">业务页签行 ｜ 按钮并入右侧（原 112）</span></div>
+  <div class="h">36<span class="note">方法 124 ｜ 地址弹性 ｜ Send 100</span></div>
+  <div class="gap">8</div>
+  <div class="h">32<span class="note">超时（秒）+ 数字框 64</span></div>
+  <div class="gap">14</div>
+  <div class="h key">312<span class="note">页签头 56 + 正文 256<br>正文 = 工具行 38 + 8 + 键值表 210<br>表 210 = 表头 40 + 表体 <b>170 → 5 行</b></span><span class="an"><i class="tag">D7</i>删掉恒空的 DESCRIPTION 列（白吃 245px）</span><span class="an"><i class="tag">D8</i>键值表 3.3 行 → 5.0 行</span></div>
+  <div class="gap">14</div>
+  <div class="h">36<span class="note">状态 · 耗时 · 大小 ｜ 格式化 · 清空响应</span></div>
+  <div class="gap">14</div>
+  <div class="h">132<span class="note">页签头 56 + 空态 76</span></div>
+  <div class="gap">16</div>
+</div>
+</div>
+</section>
+
+<section class="block">
+<h2><span class="idx">05</span>图 B · 配置态：Body = Form（1266 × 763，1:1）</h2>
+<p class="small">这是最直接回应用户诉求的一张图：类型切到 <code>Form</code>，编辑区<b>不再是文本框</b>，而是一张键值表 ——
+与上方 Params / Headers 用同一套组件语言，所以「怎么填」不需要重新学习。
+列宽：可用 936；勾选 38 / KEY 300 / VALUE 598。</p>
+
+<div class="stage">
+<div class="win">
+  <div class="sb">
+    <div class="sb-brand">
+      <div class="sb-logo"><svg class="ic ic-16"><use href="#i-layers"/></svg></div>
+      <div><div class="sb-name">ToolNest</div><div class="sb-sub">工具巢</div></div>
+    </div>
+    <div class="sb-all"><svg class="ic"><use href="#i-layers"/></svg><span>所有工具</span><span class="cnt">11</span></div>
+    <div class="sb-search"><svg class="ic"><use href="#i-search"/></svg><span>搜索功能…</span></div>
+    <div class="sb-cap">功能分类</div>
+    <div class="sb-item"><svg class="ic"><use href="#i-globe"/></svg><span>转换类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-clock"/></svg><span>时间戳转换</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-code"/></svg><span>Cron 表达式解析</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>编码/解码类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>格式化类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-hash"/></svg><span>生成类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-lines"/></svg><span>文本处理类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item on"><svg class="ic"><use href="#i-globe"/></svg><span>网络请求工具</span><span class="cnt">1</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-globe"/></svg><span>HTTP 请求工具</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-file"/></svg><span>图片处理类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg><span>文件处理类型工具</span><span class="cnt">1</span></div>
+  </div>
+
+  <div class="main rowsA">
+    <div class="pgh">
+      <div class="pgh-row">
+        <div class="pgh-back"><svg class="ic"><use href="#i-aleft"/></svg>返回</div>
+        <div class="pgh-title">HTTP 请求工具</div>
+      </div>
+      <div class="pgh-desc">网络请求工具 › HTTP 请求工具</div>
+    </div>
+    <div></div>
+    <div class="bizrow">
+      <div class="seg"><span class="on">单一请求</span><span>批处理</span></div>
+      <div class="spacer"></div>
+      <div class="btn"><svg class="ic"><use href="#i-aright"/></svg>用当前请求作为批处理模板</div>
+    </div>
+    <div class="reqrow">
+      <div class="sel mono" style="width:124px">POST<span class="cv"><svg class="ic"><use href="#i-cd"/></svg></span></div>
+      <div class="inp" style="flex:1 1 auto"><span>https://api.example.com/order/create</span></div>
+      <div class="btn primary" style="width:100px;justify-content:center">Send</div>
+    </div>
+    <div></div>
+    <div class="hintrow">
+      <span>超时（秒）</span>
+      <div class="spin">30<span class="arw"><svg class="ic ic-12"><use href="#i-up"/></svg><svg class="ic ic-12"><use href="#i-down"/></svg></span></div>
+      <div class="spacer"></div>
+      <span class="tiny">URL 与请求体中支持 {列名} 占位符，批处理时按 CSV 行替换。</span>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span>Params</span><span>Headers (1)</span><span class="on">Body · Form</span></div>
+        <div class="tabbody">
+          <div class="toolrow" style="padding:0 4px">
+            <div class="segb"><span>无</span><span>JSON</span><span class="on">Form</span><span>Form-data</span><span>XML</span><span>Text</span><span>Binary</span></div>
+            <div class="spacer"></div>
+            <span class="ctype">Content-Type: application/x-www-form-urlencoded; charset=UTF-8</span>
+            <div class="btn sm">清空</div>
+          </div>
+          <div style="height:8px"></div>
+          <div class="kv bare" style="height:210px">
+            <div class="kvh">
+              <span class="c-chk" style="width:38px"></span>
+              <span style="width:300px">KEY</span>
+              <span style="width:598px">VALUE</span>
+            </div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:300px">orderId</span><span class="kvm" style="width:598px">235027703726</span></div>
+            <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:300px">城市</span><span class="kvm" style="width:598px">北京 上海</span></div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb"></i></span><span class="kvm muted" style="width:300px">remark</span><span class="kvm muted" style="width:598px">备注（此行已取消勾选，不会发出）</span></div>
+            <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:300px">amount</span><span class="kvm" style="width:598px">1299.00</span></div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:300px"></span><span style="width:598px"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+    <div class="respbar">
+      <span class="badge"><svg class="ic ic-12"><use href="#i-check"/></svg>200 OK</span>
+      <span class="metric">128 ms</span>
+      <span class="metric">1.2 KB</span>
+      <div class="spacer"></div>
+      <span class="note">识别到 JSON 时自动高亮</span>
+      <div class="btn sm">格式化</div>
+      <div class="btn sm">清空响应</div>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span class="on">Body</span><span>响应头</span><span>请求详情</span></div>
+        <div class="tabbody">
+          <div class="empty">
+            <svg class="ic" style="width:22px;height:22px"><use href="#i-code"/></svg>
+            <div class="et">尚未发送请求</div>
+            <div class="eh">点「Send」后响应会显示在这里</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+  </div>
+
+  <div class="scrollv"><i style="top:0;height:180px"></i></div>
+</div>
+<div class="ruler rowsA" style="margin-top:0">
+  <div class="h">85<span class="note">详情页头</span></div>
+  <div class="gap">16</div>
+  <div class="h">48<span class="note">业务页签行</span></div>
+  <div class="h">36<span class="note">方法下拉（POST）</span></div>
+  <div class="gap">8</div>
+  <div class="h">32<span class="note"></span></div>
+  <div class="gap">14</div>
+  <div class="h key">312<span class="note">页签头 56 + 正文 256<br>正文 = 工具行 38 + 8 + 键值表 210<br>键值表 <b>5 行</b></span><span class="an"><i class="tag">D1</i>同一个 TextArea 承载 5 种语义 → 每种类型有专属编辑器</span><span class="an q"><i class="tag">D3</i>原文案称「会自动编码」，实测服务端收到原文 → 改为真实编码</span></div>
+  <div class="gap">14</div>
+  <div class="h">36<span class="note">响应工具行</span></div>
+  <div class="gap">14</div>
+  <div class="h">132<span class="note">响应页签保底</span></div>
+  <div class="gap">16</div>
+</div>
+</div>
+</section>
+
+<section class="block">
+<h2><span class="idx">06</span>图 C · 配置态：Body = Form-data（含本地文件选择）（1266 × 763，1:1）</h2>
+<p class="small">新增的类型。与 <code>Form</code> 的唯一结构差别是 VALUE 列多了一个<b>逐行类型</b>：
+类型 = 文本 时 VALUE 是输入框；类型 = 文件 时 VALUE 变成「[选择文件] 路径 大小 [×]」。
+列宽：可用 936；勾选 38 / KEY 216 / 类型 76 / VALUE 606。</p>
+
+<div class="stage">
+<div class="win">
+  <div class="sb">
+    <div class="sb-brand">
+      <div class="sb-logo"><svg class="ic ic-16"><use href="#i-layers"/></svg></div>
+      <div><div class="sb-name">ToolNest</div><div class="sb-sub">工具巢</div></div>
+    </div>
+    <div class="sb-all"><svg class="ic"><use href="#i-layers"/></svg><span>所有工具</span><span class="cnt">11</span></div>
+    <div class="sb-search"><svg class="ic"><use href="#i-search"/></svg><span>搜索功能…</span></div>
+    <div class="sb-cap">功能分类</div>
+    <div class="sb-item"><svg class="ic"><use href="#i-globe"/></svg><span>转换类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-clock"/></svg><span>时间戳转换</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-code"/></svg><span>Cron 表达式解析</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>编码/解码类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>格式化类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-hash"/></svg><span>生成类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-lines"/></svg><span>文本处理类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item on"><svg class="ic"><use href="#i-globe"/></svg><span>网络请求工具</span><span class="cnt">1</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-globe"/></svg><span>HTTP 请求工具</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-file"/></svg><span>图片处理类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg><span>文件处理类型工具</span><span class="cnt">1</span></div>
+  </div>
+
+  <div class="main rowsA">
+    <div class="pgh">
+      <div class="pgh-row">
+        <div class="pgh-back"><svg class="ic"><use href="#i-aleft"/></svg>返回</div>
+        <div class="pgh-title">HTTP 请求工具</div>
+      </div>
+      <div class="pgh-desc">网络请求工具 › HTTP 请求工具</div>
+    </div>
+    <div></div>
+    <div class="bizrow">
+      <div class="seg"><span class="on">单一请求</span><span>批处理</span></div>
+      <div class="spacer"></div>
+      <div class="btn"><svg class="ic"><use href="#i-aright"/></svg>用当前请求作为批处理模板</div>
+    </div>
+    <div class="reqrow">
+      <div class="sel mono" style="width:124px">POST<span class="cv"><svg class="ic"><use href="#i-cd"/></svg></span></div>
+      <div class="inp" style="flex:1 1 auto"><span>https://api.example.com/upload</span></div>
+      <div class="btn primary" style="width:100px;justify-content:center">Send</div>
+    </div>
+    <div></div>
+    <div class="hintrow">
+      <span>超时（秒）</span>
+      <div class="spin">30<span class="arw"><svg class="ic ic-12"><use href="#i-up"/></svg><svg class="ic ic-12"><use href="#i-down"/></svg></span></div>
+      <div class="spacer"></div>
+      <span class="tiny">URL 与请求体中支持 {列名} 占位符，批处理时按 CSV 行替换。</span>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span>Params</span><span>Headers</span><span class="on">Body · Form-data (2 项, 含 1 个文件)</span></div>
+        <div class="tabbody">
+          <div class="toolrow" style="padding:0 4px">
+            <div class="segb"><span>无</span><span>JSON</span><span>Form</span><span class="on">Form-data</span><span>XML</span><span>Text</span><span>Binary</span></div>
+            <div class="spacer"></div>
+            <span class="ctype">Content-Type: multipart/form-data; boundary=TnB7x8Kq</span>
+            <div class="btn sm">清空</div>
+          </div>
+          <div style="height:8px"></div>
+          <div class="kv bare" style="height:210px">
+            <div class="kvh">
+              <span class="c-chk" style="width:38px"></span>
+              <span style="width:216px">KEY</span>
+              <span style="width:76px">类型</span>
+              <span style="width:606px">VALUE</span>
+            </div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:216px">orderId</span><span style="width:76px"><span class="sel" style="height:26px;font-size:12.5px;border-radius:7px;padding:0 8px">文本<span class="cv"><svg class="ic ic-12"><use href="#i-cd"/></svg></span></span></span><span class="kvm" style="width:606px;padding:0 10px">235027703726</span></div>
+            <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:216px">avatar</span><span style="width:76px"><span class="sel" style="height:26px;font-size:12.5px;border-radius:7px;padding:0 8px">文件<span class="cv"><svg class="ic ic-12"><use href="#i-cd"/></svg></span></span></span><span class="filecell" style="width:606px"><span class="pick"><svg class="ic ic-12"><use href="#i-folder"/></svg>选择文件</span><span class="fpath">D:\assets\avatar-20260930.png</span><span class="fsize">248.6 KB</span><span class="fdel"><svg class="ic ic-12"><use href="#i-x"/></svg></span></span></div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:216px">report</span><span style="width:76px"><span class="sel" style="height:26px;font-size:12.5px;border-radius:7px;padding:0 8px">文件<span class="cv"><svg class="ic ic-12"><use href="#i-cd"/></svg></span></span></span><span class="filecell" style="width:606px"><span class="pick"><svg class="ic ic-12"><use href="#i-folder"/></svg>选择文件</span><span class="fpath">D:\out\report-0929.pdf</span><span class="fsize">1.4 MB</span><span class="fmiss">文件不存在</span><span class="fdel"><svg class="ic ic-12"><use href="#i-x"/></svg></span></span></div>
+            <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:216px">remark</span><span style="width:76px"><span class="sel" style="height:26px;font-size:12.5px;border-radius:7px;padding:0 8px">文本<span class="cv"><svg class="ic ic-12"><use href="#i-cd"/></svg></span></span></span><span class="kvm" style="width:606px;padding:0 10px">批量上传</span></div>
+            <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:216px"></span><span style="width:76px"></span><span style="width:606px"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+    <div class="respbar">
+      <span class="badge"><svg class="ic ic-12"><use href="#i-check"/></svg>200 OK</span>
+      <span class="metric">128 ms</span>
+      <span class="metric">1.2 KB</span>
+      <div class="spacer"></div>
+      <span class="note">识别到 JSON 时自动高亮</span>
+      <div class="btn sm">格式化</div>
+      <div class="btn sm">清空响应</div>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span class="on">Body</span><span>响应头</span><span>请求详情</span></div>
+        <div class="tabbody">
+          <div class="empty">
+            <svg class="ic" style="width:22px;height:22px"><use href="#i-code"/></svg>
+            <div class="et">尚未发送请求</div>
+            <div class="eh">点「Send」后响应会显示在这里</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+  </div>
+
+  <div class="scrollv"><i style="top:0;height:180px"></i></div>
+</div>
+<div class="ruler rowsA" style="margin-top:0">
+  <div class="h">85<span class="note">详情页头</span></div>
+  <div class="gap">16</div>
+  <div class="h">48<span class="note">业务页签行</span></div>
+  <div class="h">36<span class="note">方法 / 地址 / Send</span></div>
+  <div class="gap">8</div>
+  <div class="h">32<span class="note"></span></div>
+  <div class="gap">14</div>
+  <div class="h key">312<span class="note">页签头 56 + 正文 256<br>正文 = 工具行 38 + 8 + 表 210<br>类型列 76 ｜ 文件行高仍为 34，控件 26 居中<br>工具行右端显示<b>实际 boundary</b></span><span class="an"><i class="tag">D4</i>类型枚举里没有 multipart → 本轮新增 Form-data + Binary</span><span class="an">页签标题常驻 <b>(2 项, 含 1 个文件)</b>，切走也看得见</span></div>
+  <div class="gap">14</div>
+  <div class="h">36<span class="note">响应工具行</span></div>
+  <div class="gap">14</div>
+  <div class="h">132<span class="note">响应页签保底</span></div>
+  <div class="gap">16</div>
+</div>
+</div>
+</section>
+
+<section class="block">
+<h2><span class="idx">07</span>图 D · 配置态：Body = JSON（1266 × 763，1:1）</h2>
+<p class="small">文本型（JSON / XML / Text）保持现状的编辑器形态，只把它放大到 210px —— 从约 6 行变成约 11 行。
+右端动作槽只有 JSON 才有「格式化」，XML / Text 下为空（不给点了没反应的按钮）。</p>
+
+<div class="stage">
+<div class="win">
+  <div class="sb">
+    <div class="sb-brand">
+      <div class="sb-logo"><svg class="ic ic-16"><use href="#i-layers"/></svg></div>
+      <div><div class="sb-name">ToolNest</div><div class="sb-sub">工具巢</div></div>
+    </div>
+    <div class="sb-all"><svg class="ic"><use href="#i-layers"/></svg><span>所有工具</span><span class="cnt">11</span></div>
+    <div class="sb-search"><svg class="ic"><use href="#i-search"/></svg><span>搜索功能…</span></div>
+    <div class="sb-cap">功能分类</div>
+    <div class="sb-item"><svg class="ic"><use href="#i-globe"/></svg><span>转换类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-clock"/></svg><span>时间戳转换</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-code"/></svg><span>Cron 表达式解析</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>编码/解码类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>格式化类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-hash"/></svg><span>生成类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-lines"/></svg><span>文本处理类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item on"><svg class="ic"><use href="#i-globe"/></svg><span>网络请求工具</span><span class="cnt">1</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-globe"/></svg><span>HTTP 请求工具</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-file"/></svg><span>图片处理类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg><span>文件处理类型工具</span><span class="cnt">1</span></div>
+  </div>
+
+  <div class="main rowsA">
+    <div class="pgh">
+      <div class="pgh-row">
+        <div class="pgh-back"><svg class="ic"><use href="#i-aleft"/></svg>返回</div>
+        <div class="pgh-title">HTTP 请求工具</div>
+      </div>
+      <div class="pgh-desc">网络请求工具 › HTTP 请求工具</div>
+    </div>
+    <div></div>
+    <div class="bizrow">
+      <div class="seg"><span class="on">单一请求</span><span>批处理</span></div>
+      <div class="spacer"></div>
+      <div class="btn"><svg class="ic"><use href="#i-aright"/></svg>用当前请求作为批处理模板</div>
+    </div>
+    <div class="reqrow">
+      <div class="sel mono" style="width:124px">PATCH<span class="cv"><svg class="ic"><use href="#i-cd"/></svg></span></div>
+      <div class="inp" style="flex:1 1 auto"><span>https://api.example.com/order/{orderId}</span></div>
+      <div class="btn primary" style="width:100px;justify-content:center">Send</div>
+    </div>
+    <div></div>
+    <div class="hintrow">
+      <span>超时（秒）</span>
+      <div class="spin">30<span class="arw"><svg class="ic ic-12"><use href="#i-up"/></svg><svg class="ic ic-12"><use href="#i-down"/></svg></span></div>
+      <div class="spacer"></div>
+      <span class="tiny">URL 与请求体中支持 {列名} 占位符，批处理时按 CSV 行替换。</span>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span>Params</span><span>Headers (1)</span><span class="on">Body · JSON</span></div>
+        <div class="tabbody">
+          <div class="toolrow" style="padding:0 4px">
+            <div class="segb"><span>无</span><span class="on">JSON</span><span>Form</span><span>Form-data</span><span>XML</span><span>Text</span><span>Binary</span></div>
+            <div class="spacer"></div>
+            <span class="ctype">Content-Type: application/json; charset=UTF-8</span>
+            <div class="btn sm">格式化</div>
+          </div>
+          <div style="height:8px"></div>
+          <div class="ta" style="height:210px">{
+  <span class="k">"orderId"</span>: <span class="s">"{orderId}"</span>,
+  <span class="k">"type"</span>: <span class="s">"A"</span>,
+  <span class="k">"amount"</span>: <span class="s">1299.00</span>,
+  <span class="k">"paid"</span>: <span class="s">true</span>,
+  <span class="k">"items"</span>: [
+    { <span class="k">"sku"</span>: <span class="s">"SKU-001"</span>, <span class="k">"qty"</span>: <span class="s">2</span> }
+  ]
+}</div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+    <div class="respbar">
+      <span class="badge"><svg class="ic ic-12"><use href="#i-check"/></svg>200 OK</span>
+      <span class="metric">128 ms</span>
+      <span class="metric">1.2 KB</span>
+      <div class="spacer"></div>
+      <span class="note">识别到 JSON 时自动高亮</span>
+      <div class="btn sm">格式化</div>
+      <div class="btn sm">清空响应</div>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span class="on">Body</span><span>响应头</span><span>请求详情</span></div>
+        <div class="tabbody">
+          <div class="empty">
+            <svg class="ic" style="width:22px;height:22px"><use href="#i-code"/></svg>
+            <div class="et">尚未发送请求</div>
+            <div class="eh">点「Send」后响应会显示在这里</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+  </div>
+
+  <div class="scrollv"><i style="top:0;height:180px"></i></div>
+</div>
+<div class="ruler rowsA" style="margin-top:0">
+  <div class="h">85<span class="note">详情页头</span></div>
+  <div class="gap">16</div>
+  <div class="h">48<span class="note">业务页签行</span></div>
+  <div class="h">36<span class="note">方法下拉（PATCH，本轮新增）</span></div>
+  <div class="gap">8</div>
+  <div class="h">32<span class="note"></span></div>
+  <div class="gap">14</div>
+  <div class="h key">312<span class="note">页签头 56 + 正文 256<br>正文 = 工具行 38 + 8 + 文本区 210<br>文本区 210 ÷ 18 = <b>11 行</b>（原 127 ≈ 6 行）</span><span class="an"><i class="tag">D9</i>编辑器 127 → 210px，可见行数翻倍</span><span class="an q"><i class="tag">D5</i>手动 Content-Type 与请求体类型冲突时，工具行就地提示</span></div>
+  <div class="gap">14</div>
+  <div class="h">36<span class="note">响应工具行</span></div>
+  <div class="gap">14</div>
+  <div class="h">132<span class="note">响应页签保底</span></div>
+  <div class="gap">16</div>
+</div>
+</div>
+</section>
+
+<section class="block">
+<h2><span class="idx">08</span>图 E · 查看态：请求折叠，响应吃满（1266 × 763，1:1）</h2>
+<p class="small">按下 Send 的瞬间，请求配置区折成一条 46px 摘要条 —— 方法与 URL 都在，改一眼就能看见；
+一个「展开编辑」按钮回到配置态，参数不丢。响应区因此从 187px ≈ 10 行变成 432px ≈ 24 行。
+这个模式不是新发明的：批处理页的三段折叠（①②可折叠、③常驻）已经是本模块的语言。</p>
+
+<div class="stage">
+<div class="win">
+  <div class="sb">
+    <div class="sb-brand">
+      <div class="sb-logo"><svg class="ic ic-16"><use href="#i-layers"/></svg></div>
+      <div><div class="sb-name">ToolNest</div><div class="sb-sub">工具巢</div></div>
+    </div>
+    <div class="sb-all"><svg class="ic"><use href="#i-layers"/></svg><span>所有工具</span><span class="cnt">11</span></div>
+    <div class="sb-search"><svg class="ic"><use href="#i-search"/></svg><span>搜索功能…</span></div>
+    <div class="sb-cap">功能分类</div>
+    <div class="sb-item"><svg class="ic"><use href="#i-globe"/></svg><span>转换类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-clock"/></svg><span>时间戳转换</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-code"/></svg><span>Cron 表达式解析</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>编码/解码类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-brackets"/></svg><span>格式化类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-hash"/></svg><span>生成类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-lines"/></svg><span>文本处理类型工具</span><span class="cnt">2</span></div>
+    <div class="sb-item on"><svg class="ic"><use href="#i-globe"/></svg><span>网络请求工具</span><span class="cnt">1</span></div>
+    <div class="sb-item leaf"><svg class="ic ic-12"><use href="#i-globe"/></svg><span>HTTP 请求工具</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-file"/></svg><span>图片处理类型工具</span><span class="cnt">1</span></div>
+    <div class="sb-item"><svg class="ic"><use href="#i-folder"/></svg><span>文件处理类型工具</span><span class="cnt">1</span></div>
+  </div>
+
+  <div class="main rowsB">
+    <div class="pgh">
+      <div class="pgh-row">
+        <div class="pgh-back"><svg class="ic"><use href="#i-aleft"/></svg>返回</div>
+        <div class="pgh-title">HTTP 请求工具</div>
+      </div>
+      <div class="pgh-desc">网络请求工具 › HTTP 请求工具</div>
+    </div>
+    <div></div>
+    <div class="bizrow">
+      <div class="seg"><span class="on">单一请求</span><span>批处理</span></div>
+      <div class="spacer"></div>
+      <div class="btn"><svg class="ic"><use href="#i-aright"/></svg>用当前请求作为批处理模板</div>
+    </div>
+    <div class="strip">
+      <span class="verb">POST</span>
+      <span class="u">https://api.example.com/order/create</span>
+      <span class="meta">Body · Form（3 项）</span>
+      <span class="meta">超时 30s</span>
+      <div class="btn sm"><svg class="ic ic-12"><use href="#i-down"/></svg>展开编辑</div>
+      <div class="btn primary sm" style="width:76px;justify-content:center">重发</div>
+    </div>
+    <div></div>
+    <div class="respbar">
+      <span class="badge"><svg class="ic ic-12"><use href="#i-check"/></svg>200 OK</span>
+      <span class="metric">128 ms</span>
+      <span class="metric">1.2 KB</span>
+      <div class="spacer"></div>
+      <span class="note">识别到 JSON 时自动高亮</span>
+      <div class="btn sm">压缩</div>
+      <div class="btn sm">清空响应</div>
+    </div>
+    <div></div>
+    <div class="pad" style="display:flex">
+      <div class="tabs" style="flex:1 1 auto">
+        <div class="tabhead"><span class="on">Body</span><span>响应头 (9)</span><span>请求详情</span></div>
+        <div class="tabbody">
+          <div class="ta" style="height:432px;border:none;border-radius:0;padding:10px 12px">{
+  <span class="k">"code"</span>: <span class="s">0</span>,
+  <span class="k">"message"</span>: <span class="s">"success"</span>,
+  <span class="k">"data"</span>: {
+    <span class="k">"orderId"</span>: <span class="s">"235027703726"</span>,
+    <span class="k">"status"</span>: <span class="s">"PAID"</span>,
+    <span class="k">"amount"</span>: <span class="s">1299.00</span>,
+    <span class="k">"currency"</span>: <span class="s">"CNY"</span>,
+    <span class="k">"createdAt"</span>: <span class="s">"2026-09-30T14:16:38+08:00"</span>,
+    <span class="k">"channel"</span>: <span class="s">"web"</span>,
+    <span class="k">"buyer"</span>: {
+      <span class="k">"uid"</span>: <span class="s">"u_88123"</span>,
+      <span class="k">"nickname"</span>: <span class="s">"张三"</span>,
+      <span class="k">"vip"</span>: <span class="s">true</span>
+    },
+    <span class="k">"items"</span>: [
+      { <span class="k">"sku"</span>: <span class="s">"SKU-001"</span>, <span class="k">"name"</span>: <span class="s">"机械键盘 87 键"</span>, <span class="k">"qty"</span>: <span class="s">2</span>, <span class="k">"price"</span>: <span class="s">599.00</span> },
+      { <span class="k">"sku"</span>: <span class="s">"SKU-014"</span>, <span class="k">"name"</span>: <span class="s">"腕托"</span>, <span class="k">"qty"</span>: <span class="s">1</span>, <span class="k">"price"</span>: <span class="s">101.00</span> }
+    ],
+    <span class="k">"timeline"</span>: [
+      { <span class="k">"at"</span>: <span class="s">"2026-09-30T14:16:38+08:00"</span>, <span class="k">"event"</span>: <span class="s">"CREATED"</span> },
+      { <span class="k">"at"</span>: <span class="s">"2026-09-30T14:16:41+08:00"</span>, <span class="k">"event"</span>: <span class="s">"PAID"</span> }
+    ]
+  }
+}</div>
+        </div>
+      </div>
+    </div>
+    <div></div>
+  </div>
+
+  <div class="scrollv" style="display:none"></div>
+</div>
+<div class="ruler rowsB" style="margin-top:0">
+  <div class="h">85<span class="note">详情页头</span></div>
+  <div class="gap">16</div>
+  <div class="h">48<span class="note">业务页签行</span></div>
+  <div class="h key">46<span class="note">请求摘要条 ｜ [展开编辑] + [重发]（本页唯一主色实底）</span></div>
+  <div class="gap">14</div>
+  <div class="h">36<span class="note">响应工具行（原 50 + 页签内 42 = 92）</span></div>
+  <div class="gap">14</div>
+  <div class="h key">488<span class="note">页签头 56 + 内容 <b>432</b><br>432 ÷ 18 = <b>24 行</b>（现状 187px ≈ 10 行）</span><span class="an"><i class="tag">D13</i>chrome 134 → 64px，响应区从被挤出首屏到吃满</span></div>
+  <div class="gap">16</div>
+</div>
+</div>
+</section>
+
+<section class="block">
+<h2><span class="idx">09</span>组件细节（放大到 3× / 4×，尺寸按 1:1 标注）</h2>
+
+<h3 class="sub">细节 ①　Body 类型分段控件（4×）</h3>
+<p class="small">7 项，每项高 32、圆角 7，外层轨道高 38、圆角 9、内边距 3。<b>浏览器实测总宽 427.8px</b>（各项 <code>37 / 57.8 / 56.3 / 92.8 / 51.8 / 48.8 / 63.2</code>，合计 408，其余为轨道内边距、边框与项间距）
+—— 940 内宽下留有约 512px 给右侧的 Content-Type 与动作槽。</p>
+<div class="zoom">
+  <div class="z4">
+    <div class="toolrow">
+      <div class="segb"><span>无</span><span>JSON</span><span class="on">Form</span><span>Form-data</span><span>XML</span><span>Text</span><span>Binary</span></div>
+      <div class="spacer"></div>
+      <span class="ctype">Content-Type: application/x-www-form-urlencoded; charset=UTF-8</span>
+      <div class="btn sm">清空</div>
+    </div>
+  </div>
+</div>
+<div class="callouts">
+  <div><span class="mk">轨道 38 / 圆角 9 / 内边距 3</span></div>
+  <div><span class="mk">项 32（标准档）/ 圆角 7 / 横向内边距 12</span></div>
+  <div><span class="mk">选中项</span>＝白底滑块 + 粗体 + 1px 投影（与业务页签同一套长相）</div>
+  <div><span class="mk">动作槽固定宽 66</span>：不给假按钮，Form/Text/XML 下为空</div>
+</div>
+
+<h3 class="sub">细节 ②　Form 键值行（4×）</h3>
+<p class="small">与 Params / Headers 完全同构：勾选列 38 + 两列表头 40 + 行 34 + 尾行常留空。
+勾选列的语义是「这一行参不参与请求」，取消勾选的行整行转 <code>-dt-text-subtle</code> —— 颜色之外还有勾选框本身的形状，
+不是只靠变淡表达（<code>DESIGN.md</code>：「颜色永不是唯一线索」）。</p>
+<div class="zoom">
+  <div class="z4">
+    <div class="kv bare" style="height:210px">
+      <div class="kvh">
+        <span class="c-chk" style="width:38px"></span>
+        <span style="width:300px">KEY</span>
+        <span style="width:598px">VALUE</span>
+      </div>
+      <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:300px">orderId</span><span class="kvm" style="width:598px">235027703726</span></div>
+      <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:300px">城市</span><span class="kvm" style="width:598px">北京 上海</span></div>
+      <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb"></i></span><span class="kvm muted" style="width:300px">remark</span><span class="kvm muted" style="width:598px">取消勾选的行不发出</span></div>
+      <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:300px">amount</span><span class="kvm" style="width:598px">1299.00</span></div>
+      <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:300px"></span><span style="width:598px"></span></div>
+    </div>
+  </div>
+</div>
+<div class="callouts">
+  <div><span class="mk">表头 40</span>　11px 粗体 · <code>-dt-text-subtle</code> · <code>-dt-surface-alt</code> 底</div>
+  <div><span class="mk">行 34</span>　12.5px · 等宽值 · 偶数行 <code>-dt-row-alt</code></div>
+  <div><span class="mk">列 38 / 300 / 598</span>　合计 936（外框 940 − 边框 2 − 内边距 2）</div>
+</div>
+
+<h3 class="sub">细节 ③　文件行的三种状态（4×）</h3>
+<p class="small">文件行是本轮唯一的新组件。三种状态都必须有<b>文字</b>说明，不能只靠颜色：
+未选、已选（路径 + 大小）、以及<b>已选但文件已经不在了</b>（用户移动/删除过）——
+最后一种如果静默处理，用户会以为文件发出去了。</p>
+<div class="zoom">
+  <div class="z4">
+    <div class="kv bare" style="height:140px">
+      <div class="kvh">
+        <span class="c-chk" style="width:38px"></span>
+        <span style="width:216px">KEY</span>
+        <span style="width:76px">类型</span>
+        <span style="width:606px">VALUE</span>
+      </div>
+      <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:216px">attachment</span><span style="width:76px"><span class="sel" style="height:26px;font-size:12.5px;border-radius:7px;padding:0 8px">文件<span class="cv"><svg class="ic ic-12"><use href="#i-cd"/></svg></span></span></span><span class="filecell" style="width:606px"><span class="pick"><svg class="ic ic-12"><use href="#i-folder"/></svg>选择文件</span><span class="fpath" style="color:var(--dt-text-subtle)">未选择文件</span></span></div>
+      <div class="kvrow alt"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:216px">avatar</span><span style="width:76px"><span class="sel" style="height:26px;font-size:12.5px;border-radius:7px;padding:0 8px">文件<span class="cv"><svg class="ic ic-12"><use href="#i-cd"/></svg></span></span></span><span class="filecell" style="width:606px"><span class="pick"><svg class="ic ic-12"><use href="#i-folder"/></svg>选择文件</span><span class="fpath">D:\assets\avatar-20260930.png</span><span class="fsize">248.6 KB</span><span class="fdel"><svg class="ic ic-12"><use href="#i-x"/></svg></span></span></div>
+      <div class="kvrow"><span class="c-chk" style="width:38px"><i class="cb on"><svg class="ic ic-12"><use href="#i-check"/></svg></i></span><span class="kvm" style="width:216px">report</span><span style="width:76px"><span class="sel" style="height:26px;font-size:12.5px;border-radius:7px;padding:0 8px">文件<span class="cv"><svg class="ic ic-12"><use href="#i-cd"/></svg></span></span></span><span class="filecell" style="width:606px"><span class="pick"><svg class="ic ic-12"><use href="#i-folder"/></svg>重新选择</span><span class="fpath">D:\out\report-0929.pdf</span><span class="fmiss">文件不存在</span><span class="fdel"><svg class="ic ic-12"><use href="#i-x"/></svg></span></span></div>
+    </div>
+  </div>
+</div>
+<div class="callouts">
+  <div><span class="mk">行高仍 34</span>　按钮 26 居中 → 表格不会被文件行撑高</div>
+  <div><span class="mk">路径弹性 + 省略号</span>，大小与「文件不存在」<code>flex:none</code> → 两者永远可见</div>
+  <div><span class="mk">按钮文案随状态变</span>：选择文件 → 重新选择</div>
+</div>
+
+<h3 class="sub">细节 ④　响应工具行（原来分散在两个 42px 高的地方）（4×）</h3>
+<div class="zoom">
+  <div class="z4">
+    <div class="respbar">
+      <span class="badge"><svg class="ic ic-12"><use href="#i-check"/></svg>200 OK</span>
+      <span class="metric">128 ms</span>
+      <span class="metric">1.2 KB</span>
+      <div class="spacer"></div>
+      <span class="note">识别到 JSON 时自动高亮</span>
+      <div class="btn sm">格式化</div>
+      <div class="btn sm">清空响应</div>
+    </div>
+  </div>
+</div>
+<div class="callouts">
+  <div><span class="mk">高 36</span>（原：响应状态栏 50 + 页签内工具条 42 = 92）</div>
+  <div><span class="mk">状态</span>＝数字 + 文字，色值只是辅助</div>
+  <div><span class="mk">耗时 / 大小走等宽</span>，不随数字位数跳动</div>
+</div>
+</section>
+
+<section class="block">
+<h2><span class="idx">10</span>尺寸令牌与节点级改动清单</h2>
+
+<h3 class="sub">10.1 尺寸令牌（沿用控件高度阶梯，不新增档位）</h3>
+<table class="t">
+<tr><th style="width:150px">档位</th><th style="width:70px">值</th><th>本页用途</th></tr>
+<tr><td>标准</td><td class="n">32</td><td>方法下拉（高）· 分段控件项 · 工具行内按钮以外的控件 · 表格内联编辑</td></tr>
+<tr><td>强调</td><td class="n">36</td><td>请求行三件套：方法 / 地址 / Send（全页唯一的输入焦点带）</td></tr>
+<tr><td>页头</td><td class="n">30</td><td>返回按钮 · 内层数据页签</td></tr>
+<tr><td>紧凑</td><td class="n">28</td><td>工具行与响应行的按钮：清空 · 格式化 · 展开编辑 · 清空响应</td></tr>
+<tr><td>表内</td><td class="n">26</td><td>文件选择按钮（沿用 <code>DESIGN.md</code> §4「内联编辑框高 26px，保持行高稳定」）</td></tr>
+<tr><td>分段轨道</td><td class="n">38</td><td>项 32 + 内边距 3×2（外层业务页签与 Body 类型共用同一档）</td></tr>
+<tr><td>表头 / 行</td><td class="n">40 / 34</td><td>所有键值表</td></tr>
+<tr><td>内层页签头</td><td class="n">56</td><td>文字 30 + 2px 下划线 + 内容区上边距 14（现状实测值，保持不变）</td></tr>
+</table>
+<p class="small"><b>圆角</b>：32 / 36 → 8；28 / 30 → 7；分段轨道 9 / 分段项 7；卡片 11；键值表 9（放进页签正文时不自描边、圆角 0，避免「卡里的卡」）。</p>
+
+<h3 class="sub">10.2 节点级改动清单</h3>
+<table class="t">
+<tr><th style="width:34px">#</th><th style="width:330px">节点 / 文件</th><th>动作</th><th style="width:140px">高度 · 宽度变化</th></tr>
+<tr><td class="n">1</td><td class="n">SingleRequestPanel · 请求 TabPane</td><td>pref/min 高 248 → 312</td><td class="n">+64</td></tr>
+<tr><td class="n">2</td><td class="n">Body 类型控件</td><td>ComboBox（210×32）→ 分段控件（7 项，实测 <b>427.8×38</b>）</td><td class="n">38（高）</td></tr>
+<tr><td class="n">3</td><td class="n">Body 编辑器容器（新增）</td><td>按类型切换的容器：键值表 / form-data 表 / 文本区 / 空态 / 单文件选择器</td><td class="n">127 → 210</td></tr>
+<tr><td class="n">4</td><td class="n">Body 工具行</td><td>「类型下拉 + 原因文字 + 格式化」→「分段 + 弹性 + Content-Type / 守卫提示 + 动作槽」；删掉独立的 15px 说明行</td><td class="n">32 → 38，省 15</td></tr>
+<tr><td class="n">5</td><td class="n">Body 页签标题</td><td><code>Body</code> → <code>Body · Form</code> / <code>Body · Form-data (2 项, 含 1 个文件)</code>，切到别页签也能看见当前类型</td><td class="n">—</td></tr>
+<tr><td class="n">6</td><td class="n">「格式化」按钮</td><td>仅在 JSON 下创建；XML / Text 下动作槽为空</td><td class="n">修 D10</td></tr>
+<tr><td class="n">7</td><td class="n">KeyValueTable · DESCRIPTION 列</td><td>删除；列宽改为 勾选 38 / KEY 弹性 / VALUE 弹性（Params 实测 38 / 340 / 558）</td><td class="n">修 D7</td></tr>
+<tr><td class="n">8</td><td class="n">FormDataTable（新增）</td><td>键值表 + 逐行类型列（76）+ 文件单元格渲染器（选择文件 / 路径 / 大小 / 文件不存在 / 清除）</td><td class="n">新组件</td></tr>
+<tr><td class="n">9</td><td class="n">HttpRequestSpec.BodyType</td><td>+<code>FORM_DATA</code>（multipart/form-data）、+<code>BINARY</code>（application/octet-stream）</td><td class="n">修 D4</td></tr>
+<tr><td class="n">10</td><td class="n">HttpRequestSpec.Method</td><td>+<code>PATCH</code></td><td class="n">修 D12</td></tr>
+<tr><td class="n">11</td><td class="n">HttpEngine</td><td>multipart 组包（boundary + 各段 Content-Disposition）；form-urlencoded 按 RFC 3986 编码；binary 走文件流</td><td class="n">修 D3 / D4</td></tr>
+<tr><td class="n">12</td><td class="n">.http-response-bar</td><td>高 50 → 36；吸纳原 Body 页签内 42px 工具条（JSON 提示 + 格式化 + 清空响应）</td><td class="n">−56</td></tr>
+<tr><td class="n">13</td><td class="n">请求折叠摘要条（新增）</td><td>发送后把请求配置区折成 46px；含「展开编辑」</td><td class="n">+46（查看态）</td></tr>
+<tr><td class="n">14</td><td class="n">HttpToolModule · carryOver 按钮</td><td>从独立一行移入业务页签行右侧</td><td class="n">−48</td></tr>
+<tr><td class="n">15</td><td class="n">app.css</td><td><code>.module-body</code> padding <code>22 24 26 24</code> → <code>16 24 16 24</code>；业务页签带下两段内边距 12 + 14 → 6 + 4（得 48）</td><td class="n">−26</td></tr>
+</table>
+</section>
+
+<section class="block">
+<h2><span class="idx">11</span>不变量清单</h2>
+<p class="small">每条都要能在实施后用<b>渲染结果</b>验证，不靠「读代码觉得对」。</p>
+<table class="t">
+<tr><th style="width:230px">不变量</th><th>本设计如何满足</th><th style="width:310px">实施后的验证方式</th></tr>
+<tr><td>一屏只有一处主色实底</td><td>只有 Send 是 <code>.button-primary</code>；选择文件 / 清空 / 格式化 / 展开编辑全部落在次操作与紧凑档</td><td>离屏渲染后数 <code>#2563eb</code> 实底按钮数 = 1</td></tr>
+<tr><td>一屏只有一个最大字级 23px</td><td>仅详情页标题</td><td>扫所有 Label 的 <code>font-size</code> 最大值出现次数 = 1</td></tr>
+<tr><td>控件高度只取既定档位</td><td>见 §10.1（32 / 36 / 30 / 28 / 26 / 轨道 38）</td><td>量每个控件的实际高度，逐档比对，越档即红</td></tr>
+<tr><td><code>pref</code> 与 <code>min</code> 成对</td><td>请求页签 312、响应页签保底 132、工具行 38、键值表 210、折叠条 46 全部成对写</td><td>沿用 <code>nav</code> 探针的「尺寸完整性」断言（实际高 ≥ pref 高）</td></tr>
+<tr><td>装不下只能滚动，不能压缩</td><td>820×560 展开配置态时出外层滚动条（溢出 203px），控件一个都不压</td><td>820×560 下量控件实际高 vs pref 高</td></tr>
+<tr><td>颜色永不是唯一线索</td><td>取消勾选的行：勾选框形状 + 整行转 <code>-dt-text-subtle</code>；Content-Type 冲突：自绘 warn 图标 + 整句文字；文件丢失：明写「文件不存在」</td><td>灰度截图里逐条确认仍可辨</td></tr>
+<tr><td>禁用态必须配文字，不能只做 <code>setDisable</code></td><td>类型 = 无时编辑区走 <code>UiKit.setDegraded</code>（整组 42%）+ 空态文案；路径 <b>不</b>走 <code>setDisable</code></td><td>实测透明度 + 文案可见性（沿用 <code>httpsect</code> 的断言方式）</td></tr>
+<tr><td>两层页签形态必须不同</td><td>外层：38 轨道 + 白色滑块；内层：30 文字 + 2px 下划线</td><td>两者实测高度不同且形态可辨</td></tr>
+<tr><td>表格行高 34 / 表头 40</td><td>Params / Headers / Form / form-data 四张表一致</td><td>量 <code>fixedCellSize</code> 与表头实际高</td></tr>
+<tr><td>不新增色相</td><td>只用到既有令牌：<code>-dt-accent</code>、<code>-dt-success</code>、<code>-dt-warning</code>、<code>-dt-danger</code> 及其浅底；文件类型标签无新色</td><td>diff <code>app.css</code> 的 <code>.root</code>，令牌数量不增</td></tr>
+</table>
+</section>
+
+<section class="block">
+<h2><span class="idx">12</span>窄窗降级：820 × 560（最小窗口）</h2>
+<p class="small">此节为<b>计算值</b>，未做逐像素验证 —— 报告时按未执行处理。</p>
+<table class="t">
+<tr><th style="width:200px">量</th><th style="width:110px">值</th><th>推导</th></tr>
+<tr><td>可用内宽</td><td class="n">494</td><td>820 − 侧边栏 267 − 竖滚动条 11 − 左右留白 48</td></tr>
+<tr><td>面板可用高</td><td class="n">395</td><td>560 − 详情页头 85 − chrome 80（16 + 48 + 16）</td></tr>
+<tr><td>配置态需要</td><td class="n">598</td><td>76 + 14 + 312 + 14 + 36 + 14 + 132</td></tr>
+<tr><td><b>溢出</b></td><td class="n"><b>203</b></td><td>→ 外层出现滚动条（<b>确认的取舍</b>，不是通过）</td></tr>
+</table>
+
+<h3 class="sub">降级动作（按顺序生效）</h3>
+<ol class="small" style="line-height:1.9">
+<li><b>窄窗默认进入查看态</b>：请求折叠为 46px → 46 + 14 + 36 + 14 + 132 = 242 ≤ 395，<b>首屏不出现滚动条</b>；用户点「展开编辑」才滚动。</li>
+<li><b>Body 工具行内宽 &lt; 620 时隐藏 Content-Type 常驻后缀</b>（它可从「请求详情」页签读到）；冲突提示保留，文案压缩为「warn 图标 + Content-Type 与类型不一致」。</li>
+<li><b>分段项横向内边距 12 → 10</b>（≈380 → 366），配合 28px 的清空按钮，工具行需 366 + 8 + 66 = 440 ≤ 494，满足</li>
+<li><b>form-data 表最小必需宽 614</b>（38 + KEY 120 + 类型 76 + VALUE 380）→ 内宽 &lt; 614 时表格<b>横向滚动，不压列宽</b>。这与批处理页结果表的处置一致（最小必需宽 520 → 免横滚临界 ≈1155px）。</li>
+<li>请求行的地址输入框允许压到约 250px（方法 124 + Send 100 + 间距 16），输入框自身横向滚动。</li>
+</ol>
+
+<h3 class="sub">确认的取舍（不许当成「已通过」）</h3>
+<ul class="small" style="line-height:1.9">
+<li>820×560 <b>展开</b>配置态时，外层必然出现约 203px 的滚动条。</li>
+<li>窄窗下 form-data 表必然横向滚动。</li>
+<li>若侧边栏不折叠，820 下内容区只有 553px —— 这是本设计最紧的一档（<code>DESIGN.md</code> 已识别「侧边栏未实现折叠」为风险）。</li>
+</ul>
+</section>
+
+<section class="block">
+<h2><span class="idx">13</span>设计稿自身的验证（可复算）</h2>
+<p class="small">这一节的数字不是声明，是<b>真实浏览器量出来的</b>：Playwright 驱动系统 Chrome 加载本文件，逐条读
+<code>getBoundingClientRect()</code> 与 <code>getComputedStyle()</code>。
+「读源码看着对」不算通过 —— 面积预算表里的每一个数都必须与画布实测相等，行高加总必须严格等于 763。</p>
+
+<h3 class="sub">13.1 画布与行模板</h3>
+<table class="t">
+<tr><th style="width:130px">画布</th><th style="width:110px">外框</th><th style="width:110px">.main</th><th>实测行高（px）</th><th style="width:64px">合计</th></tr>
+<tr><td>图 A · Params</td><td class="n">1266 × 763</td><td class="n">988 × 763</td><td class="n">85 16 48 36 8 32 14 <b>312</b> 14 36 14 132 16</td><td class="n ok">763 通过</td></tr>
+<tr><td>图 B · Form</td><td class="n">1266 × 763</td><td class="n">988 × 763</td><td class="n">85 16 48 36 8 32 14 <b>312</b> 14 36 14 132 16</td><td class="n ok">763 通过</td></tr>
+<tr><td>图 C · Form-data</td><td class="n">1266 × 763</td><td class="n">988 × 763</td><td class="n">85 16 48 36 8 32 14 <b>312</b> 14 36 14 132 16</td><td class="n ok">763 通过</td></tr>
+<tr><td>图 D · JSON</td><td class="n">1266 × 763</td><td class="n">988 × 763</td><td class="n">85 16 48 36 8 32 14 <b>312</b> 14 36 14 132 16</td><td class="n ok">763 通过</td></tr>
+<tr><td>图 E · 查看态</td><td class="n">1266 × 763</td><td class="n">988 × 763</td><td class="n">85 16 48 <b>46</b> 14 36 14 <b>488</b> 16</td><td class="n ok">763 通过</td></tr>
+</table>
+<p class="small">另外断言：<b>每张画布内没有任何子元素的底边越过 763</b>（逐画布递归取 <code>max(bottom)</code>）。五张全部通过。</p>
+<p class="small">还有一条专门用来防「改了模板忘了改标尺」的断言：<b>逐个 stage 把标尺上写的数字与该行的实测高度对一遍</b>。
+右侧标尺是读者拿来核对面积预算的尺子，尺子刻错了比画布画错更危险 —— 它会让人误以为预算对得上。
+本轮就是靠它抓出「标尺写 306、而行模板 <code>rowsA</code> 的该行是 312」（分段控件从 32 改到 38 后忘了同步标签）。
+五个 stage（13 / 13 / 13 / 13 / 9 行）现全部逐行相符。</p>
+
+<h3 class="sub">13.2 关键控件实测（节选）</h3>
+<table class="t">
+<tr><th style="width:210px">控件</th><th style="width:150px">实测宽 × 高</th><th>与设计声明是否一致</th></tr>
+<tr><td class="n">.tabs（请求页签）</td><td class="n">940 × 312</td><td>一致 —— 页签头 56 + 工具行 38 + 8 + 表 210</td></tr>
+<tr><td class="n">.tabhead / .tabbody</td><td class="n">940 × 56 / 940 × 256</td><td>一致（56 + 256 = 312）</td></tr>
+<tr><td class="n">.kv.bare（键值表）</td><td class="n">940 × 210</td><td>一致 —— 表头 40 + 表体 170，按既定口径 <code>(210 − 40) ÷ 34</code> = <b>5.0 行</b>（现状 3.3 行）</td></tr>
+<tr><td class="n">.segb（类型分段控件）</td><td class="n">427.8 × 38</td><td>一致（轨道 38 = 项 32 + 3×2）；<b>§03 曾写「≈380」，浏览器给的是 427.8</b> —— 以 427.8 为准</td></tr>
+<tr><td class="n">分段各项宽</td><td class="n">37 / 57.8 / 56.3 / 92.8 / 51.8 / 48.8 / 63.2</td><td>7 项合计 408 ＋ 项间距 6×2 ＝ 12 ＋ 轨道内边距 3×2 ＝ 6 ＋ 边框 1×2 ＝ 2 → <b>428 ≈ 实测 427.8</b>，账对得上</td></tr>
+<tr><td class="n">请求行（方法 / 地址 / Send）</td><td class="n">124 / 700 / 100，均高 36</td><td>一致（124 + 700 + 100 + 间距 16 = 940）</td></tr>
+<tr><td class="n">超时数字框 .spin</td><td class="n">64 × 32</td><td>一致</td></tr>
+<tr><td class="n">Params 列宽合计</td><td class="n">38 + 340 + 558 = 936</td><td>一致 —— 表 940 − 1px 边框 ×2 − 1px 内边距 ×2 = 936</td></tr>
+<tr><td class="n">Form 列宽合计</td><td class="n">38 + 300 + 598 = 936</td><td>一致</td></tr>
+<tr><td class="n">.respbar（响应工具行）</td><td class="n">988 × 36</td><td>一致（原 50 + 页签内 42 = 92）</td></tr>
+<tr><td class="n">.strip（折叠摘要条）</td><td class="n">988 × 46</td><td>一致</td></tr>
+<tr><td class="n">.empty（响应空态）</td><td class="n">940 × 76</td><td>一致（图标 22 + 7 + 17 + 4 + 15 + 上下各 5 ≈ 76）</td></tr>
+<tr><td class="n">.btn.sm / .pick</td><td class="n">45 × 28 / 87 × 26</td><td>一致（紧凑档 28 / 表内档 26）</td></tr>
+</table>
+<p class="small"><b>一处需要说明的实测偏差</b>：<code>.kvrow</code> 在浏览器里的实测高度是 <b>33.2px</b>，不是 34。
+原因是 <code>.kv</code> 带 <code>1px</code> 边框 + <code>1px</code> 内边距（与 <code>.kv-table { -fx-padding: 1; }</code> 同构），
+在 <code>flex-direction: column</code> 下这 4px 被平摊到 5 行里。
+真实 JavaFX 的 <code>Region</code> 同理 —— 所以这是口径问题，不是稿子画错：
+<b>行的设计值仍是 34</b>，行数按既定的 <code>(表高 − 表头) ÷ 34</code> 记作 5.0 行，与「现状 3.3 行」用的是同一把尺。</p>
+
+<h3 class="sub">13.3 卫生与出处</h3>
+<table class="t">
+<tr><th style="width:230px">检查项</th><th style="width:150px">实测</th><th>判定</th></tr>
+<tr><td>令牌与 <code>app.css</code> 逐条比对</td><td class="n">30 项</td><td class="ok">不一致 0 项</td></tr>
+<tr><td>emoji / Unicode 装饰符号</td><td class="n">0</td><td class="ok">通过</td></tr>
+<tr><td>外链资源（CDN / 图片 / 字体）</td><td class="n">0</td><td class="ok">通过（单文件零依赖）</td></tr>
+<tr><td><code>@font-face</code> / 网络字体</td><td class="n">0</td><td class="ok">通过</td></tr>
+<tr><td>主色实底按钮 <code>#2563eb</code></td><td class="n">5 / 5 张画布</td><td class="ok">每张恰好 1 个：Send ×4 + 重发（通过）</td></tr>
+<tr><td>页面 JS 错误 / 网络请求数</td><td class="n">0 / 1</td><td class="ok">通过（1 = 只有主文档本身）</td></tr>
+<tr><td>列宽合计回到 936</td><td class="n">936 / 936 / 936</td><td class="ok">通过（三张表逐个核对）</td></tr>
+</table>
+
+<div class="hr"></div>
+<table class="t">
+<tr><th style="width:230px">出处（provenance）</th><th>值</th></tr>
+<tr><td>设计图</td><td class="n">design/http-single-redesign.html</td></tr>
+<tr><td>验证器</td><td class="n">verify-mockup.js · verify-mockup.cmd（项目根；playwright-core + 系统 Chrome，非 headless-shell）</td></tr>
+<tr><td>复算命令</td><td class="n">verify-mockup.cmd（在项目根直接双击或命令行运行）</td></tr>
+<tr><td>报告与截图</td><td class="n">build/http-single-review/verify-report.txt · shots/canvas-{1..5}.png · full-page.png</td></tr>
+<tr><td>设计图 sha256 / 字节数 / mtime</td><td class="n">记在 <code>verify-report.txt</code> 的 §9</td></tr>
+<tr><td>截图 mtime 晚于设计图</td><td class="ok">是（报告 §9 里逐张核过）</td></tr>
+</table>
+<p class="small"><b>为什么哈希不写在这张表里</b>：本节本身就是被哈希的那个文件的一部分，写进去就变成自指 ——
+每填一次数字，字节数和哈希都会立刻改变，永远追不上。所以<b>运行时快照以 <code>verify-report.txt</code> 为准</b>：
+那里有设计图的 sha256、字节数、mtime，以及五张截图的 mtime，且断言了「截图晚于设计图」。
+评审时按上面那条复算命令重跑一次就能得到当次的同款快照。</p>
+<p class="small"><b>为什么这一步不能省</b>：本稿在编写过程中真实出现过四类「源码看着对、渲染不对」的问题 ——
+① 给内层页签加了白卡边框，边框计入 grid 行高，每行凭空少 2px，实测 56/254 与声明 56/256 不符；
+② 列宽按 940 写，实测列和 936（外框 1px ×2 + 内边距 1px ×2）；
+③ 标尺标签写 306，而行模板 <code>rowsA</code> 的该行是 312 —— 分段控件从 32 改到 38 之后忘了同步标签；
+④ form-data 表有两行的 VALUE 单元格写成 610（应为 606），列和 940 &gt; 936，最后一列被 <code>overflow:hidden</code> 悄悄裁掉 4px。
+四条都是靠实测数字对不上才发现并修掉的 —— 其中 ③ 与 ④ 正是本轮新加的两条断言（<b>标尺标签 vs 实测行高</b>、<b>列宽合计 = 936</b>）抓出来的，
+在这两条断言之前，它们已经躺在稿子里没人发现。</p>
+</section>
+
+<section class="block">
+<h2><span class="idx">14</span>待你拍板</h2>
+
+<div class="q">
+<div class="qh">Q1　请求区什么时候折叠？</div>
+<ul>
+<li>选项 A（推荐）：<b>按下 Send 即折叠</b>。响应区立刻从 132 → 488，连「请求中…」都在大区域里显示。</li>
+<li>选项 B：不自动折叠，只在摘要条位置给一个「最大化响应区」按钮，用户自己点。</li>
+<li>选项 C：折叠开关持久化到配置，用户自己选默认行为。</li>
+</ul>
+<p class="small" style="margin:0">倾向 A：批处理页已经确立了「配置折叠、结果常驻」的语言，同一模块里保持一致比单页最优更重要。</p>
+</div>
+
+<div class="q">
+<div class="qh">Q2　折叠之后想改一个参数再发，走哪条路？</div>
+<ul>
+<li>选项 A（推荐）：点摘要条上的「展开编辑」→ 完整配置回来。</li>
+<li>选项 B（已并入主设计）：摘要条上直接放「重发」，不展开也能重试。</li>
+<li>选项 C：两条都给。</li>
+</ul>
+</div>
+
+<div class="q qw">
+<div class="qh">Q3　新增的 Form-data / Binary 进不进批处理页？（影响面最大的一条）</div>
+<p class="small" style="margin:6px 0">批处理页用 <code>{列名}</code> 占位符把 CSV 的值替换进请求。文件字段没有「值」可言，只有路径 —— 于是必须先定义：CSV 里的一列能不能直接写成文件路径？</p>
+<ul>
+<li>选项 A（推荐）：<b>本轮只做单一请求页</b>。批处理页暂不暴露 Form-data / Binary（枚举扩了，但批处理页的类型下拉先不列出来），单独一轮再设计文件列的占位符语义。</li>
+<li>选项 B：同时支持，占位符 <code>{文件名}</code> 指向 CSV 里的路径，路径不存在就按行记失败。</li>
+<li>选项 C：同时支持，但文件列只允许「一整列都是同一目录下的文件名」这种受限形态。</li>
+</ul>
+</div>
+
+<div class="q">
+<div class="qh">Q4　方法要不要补齐？</div>
+<ul>
+<li>选项 A（推荐）：补 <code>PATCH</code>（接口调试的高频缺口）。</li>
+<li>选项 B：补 <code>PATCH</code> + <code>HEAD</code> + <code>OPTIONS</code>。HEAD 无响应体，响应区需要一句专门的说明；OPTIONS 返回头信息，现有「响应头」页签够用。</li>
+<li>选项 C：再加「自定义方法」输入框（JDK 的 <code>method(name, publisher)</code> 支持任意方法名）。</li>
+</ul>
+</div>
+
+<div class="q">
+<div class="qh">Q5　Params 的 DESCRIPTION 列怎么处置？</div>
+<ul>
+<li>选项 A（推荐）：<b>删除</b>。它现在恒空且点不进字，是纯占位；245px 还给 KEY / VALUE 立刻可见。</li>
+<li>选项 B：做成真正可编辑并参与保存（Postman 有这列）—— 那是新功能，需要独立的范围与验证。</li>
+<li>选项 C：只保留在 Params，Headers / Form 不加。</li>
+</ul>
+</div>
+
+<div class="q">
+<div class="qh">Q6　Content-Type 冲突的默认处置？</div>
+<ul>
+<li>选项 A（推荐）：<b>只提示，不改用户的头</b>。事实是「将按请求头发送」，说出来即可。</li>
+<li>选项 B：切换 Body 类型时自动覆盖请求头里的 Content-Type（更省事，但用户可能故意设过）。</li>
+<li>选项 C：弹一次确认，让用户当场选。</li>
+</ul>
+</div>
+
+<div class="q">
+<div class="qh">Q7　详情页头那 85px（含独立面包屑行）动不动？</div>
+<p class="small" style="margin:0">把面包屑并到标题行右侧可再省约 20px，但这会改动 <code>UiKit.pageHeader</code>，<b>影响全部 11 个详情页</b>，不在本轮范围内。
+本轮 chrome 只动 HTTP 模块自己的部分（业务页签行与卡片间距）。要不要单开一轮统一收壳？</p>
+</div>
+</section>
+
+
+
+<div class="foot">ToolNest · HTTP 单一请求页重设计评审 v1 · 画布 1266 × 763 · 内宽 940 · 数据来自运行态探针</div>
+
+</div>
+</body>
+</html>

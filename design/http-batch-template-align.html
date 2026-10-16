@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>批处理「① 请求模板」段 — 对齐单一请求页样式（待审核 v1）</title>
+<style>
+:root{
+  --dt-canvas:#f2f4f7; --dt-content-bg:#f8f9fb; --dt-surface:#ffffff;
+  --dt-surface-alt:#fafbfc; --dt-surface-sunken:#f2f4f7; --dt-surface-hover:#e8ecf2;
+  --dt-border:#e6eaef; --dt-border-faint:#f0f3f7; --dt-border-strong:#d2d7de;
+  --dt-text:#16181d; --dt-text-muted:#5a6169; --dt-text-subtle:#8b929c; --dt-text-invert:#ffffff;
+  --dt-accent:#2563eb; --dt-accent-hover:#1d4fd7; --dt-accent-soft:#eaf0fe; --dt-accent-border:#b8cdfb;
+  --dt-warning:#a1590a; --dt-warning-soft:#fdf6ec;
+  --dt-row-alt:#fcfcfd;
+  --mono:"Cascadia Mono","Consolas","Microsoft YaHei UI",monospace;
+  --ui:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI","PingFang SC",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--ui);background:var(--dt-canvas);color:var(--dt-text);
+  font-size:13px;line-height:1.6;padding:28px 20px 60px}
+.wrap{max-width:1320px;margin:0 auto}
+h1{font-size:21px;margin-bottom:6px}
+h2{font-size:16px;margin:34px 0 12px;padding-bottom:7px;border-bottom:1px solid var(--dt-border)}
+h3{font-size:14px;margin:18px 0 8px}
+.sub{color:var(--dt-text-muted);font-size:12.5px;margin-bottom:6px}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;
+  font-weight:600;background:var(--dt-warning-soft);color:var(--dt-warning);
+  border:1px solid #f0dcb8;margin-left:8px;vertical-align:2px}
+table{border-collapse:collapse;width:100%;background:var(--dt-surface);
+  border:1px solid var(--dt-border);border-radius:8px;overflow:hidden;font-size:12.5px}
+th{background:var(--dt-surface-alt);text-align:left;padding:8px 11px;font-size:11.5px;
+  font-weight:600;color:var(--dt-text-muted);border-bottom:1px solid var(--dt-border)}
+td{padding:7px 11px;border-bottom:1px solid var(--dt-border-faint);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.n{text-align:right;font-family:var(--mono);white-space:nowrap}
+tr.tot td{background:var(--dt-surface-alt);font-weight:600}
+code{font-family:var(--mono);font-size:11.5px;background:var(--dt-surface-sunken);
+  padding:1px 5px;border-radius:4px;color:var(--dt-text)}
+.ok{color:#167a4a;font-weight:600}
+.warnrow td{background:var(--dt-warning-soft)}
+
+/* ---- 1:1 画布 ---- */
+.canvas{border:1px solid var(--dt-border-strong);border-radius:8px;overflow:hidden;
+  background:var(--dt-canvas);position:relative;margin:14px 0}
+.cap{font-size:12px;color:var(--dt-text-muted);margin:18px 0 6px}
+.cap b{color:var(--dt-text)}
+.app{width:1266px;height:763px;position:relative;background:var(--dt-canvas);
+  font-family:var(--ui);overflow:hidden}
+.sb{position:absolute;left:0;top:0;width:267px;height:763px;background:#eef1f5;
+  border-right:1px solid var(--dt-border)}
+.sb .t{font-size:15px;font-weight:700;padding:18px 18px 4px;color:var(--dt-text)}
+.sb .i{font-size:11.5px;color:var(--dt-text-subtle);padding:0 18px 14px}
+.sb .it{font-size:12.5px;padding:8px 18px;color:var(--dt-text-muted)}
+.sb .it.on{background:var(--dt-accent-soft);color:var(--dt-accent);font-weight:600;
+  border-left:3px solid var(--dt-accent);padding-left:15px}
+.main{position:absolute;left:267px;top:0;width:999px;height:763px}
+.hd{height:86px;background:var(--dt-content-bg);border-bottom:1px solid var(--dt-border);
+  padding:14px 24px 0}
+.hd .l1{font-size:11.5px;color:var(--dt-text-subtle);margin-bottom:5px}
+.hd .l2{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px}
+.hd .back{font-size:12.5px;color:var(--dt-text-muted);border:1px solid var(--dt-border-strong);
+  border-radius:7px;padding:4px 11px;background:var(--dt-surface)}
+.body{position:absolute;left:267px;top:86px;width:999px;height:677px;
+  background:var(--dt-content-bg);padding:0 24px;overflow:hidden}
+.tabs{display:flex;gap:4px;height:48px;align-items:flex-end}
+.tab{font-size:13px;padding:9px 18px;color:var(--dt-text-muted);
+  border-bottom:2px solid transparent}
+.tab.on{color:var(--dt-text);font-weight:600;border-bottom-color:var(--dt-accent)}
+.card{background:var(--dt-surface);border:1px solid var(--dt-border);border-radius:10px;
+  margin-bottom:10px;overflow:hidden}
+.ch{height:38px;display:flex;align-items:center;padding:0 14px;font-size:12.5px;font-weight:600;
+  border-bottom:1px solid var(--dt-border-faint);gap:8px}
+.cb{padding:8px 12px}
+.ruler{position:absolute;right:0;top:0;width:78px;height:100%;
+  border-left:1px dashed #c9d2dd;background:rgba(255,255,255,.72);z-index:6}
+.rl{position:absolute;left:0;width:100%;border-bottom:1px solid #dde4ec;
+  font-size:10px;color:var(--dt-text-subtle);font-family:var(--mono);
+  display:flex;align-items:flex-start;justify-content:flex-end;padding:2px 5px 0 0}
+.rlab{position:absolute;right:86px;background:#fff;border:1px solid var(--dt-accent-border);
+  color:var(--dt-accent);border-radius:5px;padding:1px 7px;font-size:10.5px;
+  font-family:var(--mono);white-space:nowrap;z-index:7;box-shadow:0 1px 3px rgba(22,24,29,.08)}
+
+/* ---- 控件 ---- */
+.method{height:36px;min-width:118px;background:var(--dt-surface);border:1px solid var(--dt-border-strong);
+  border-radius:8px;display:flex;align-items:center;padding:0 11px;font-family:var(--mono);
+  font-size:12.5px;font-weight:700;gap:7px}
+.url{flex:1;height:36px;background:var(--dt-surface);border:1px solid var(--dt-border-strong);
+  border-radius:8px;display:flex;align-items:center;padding:0 12px;font-family:var(--mono);
+  font-size:12.5px;color:var(--dt-text)}
+.caret{font-size:9px;color:var(--dt-text-subtle)}
+.hint{font-size:11.5px;color:var(--dt-text-subtle);white-space:nowrap}
+.seg{display:inline-flex;background:#eef1f5;border-radius:9px;padding:3px;gap:2px;height:38px;
+  align-items:center}
+.si{height:32px;padding:0 13px;border-radius:7px;font-size:12.5px;color:var(--dt-text-muted);
+  display:flex;align-items:center}
+.si.on{background:var(--dt-surface);border:1px solid var(--dt-border-strong);
+  color:var(--dt-text);font-weight:600}
+.gap{flex:1}
+.btn{height:26px;padding:0 11px;border-radius:7px;border:1px solid var(--dt-border-strong);
+  background:var(--dt-surface);font-size:12px;color:var(--dt-text);
+  display:inline-flex;align-items:center}
+.ct{font-size:11.5px;color:var(--dt-text-subtle);font-family:var(--mono)}
+.inner-tabs{display:flex;gap:2px;height:42px;align-items:flex-end;
+  border-bottom:1px solid var(--dt-border)}
+.it{font-size:12.5px;padding:7px 14px;color:var(--dt-text-muted);
+  border-bottom:2px solid transparent;margin-bottom:-1px}
+.it.on{color:var(--dt-text);font-weight:600;border-bottom-color:var(--dt-accent)}
+.editor{margin:8px 12px;height:76px;background:var(--dt-surface-alt);
+  border:1px solid var(--dt-border);border-radius:8px;padding:8px 11px;
+  font-family:var(--mono);font-size:12.5px;color:var(--dt-text);line-height:1.55}
+.deg{opacity:.42}
+.dnote{font-size:11.5px;color:var(--dt-warning);background:var(--dt-warning-soft);
+  border:1px solid #f0dcb8;border-radius:6px;padding:1px 8px;display:inline-block}
+.kv{margin:8px 12px;border:1px solid var(--dt-border);border-radius:8px;overflow:hidden;
+  background:var(--dt-surface)}
+.kvh{height:34px;background:var(--dt-surface-alt);display:flex;align-items:center;
+  font-size:11.5px;font-weight:600;color:var(--dt-text-muted);padding:0 12px;
+  border-bottom:1px solid var(--dt-border)}
+.kvr{height:34px;display:flex;align-items:center;border-bottom:1px solid var(--dt-border-faint);
+  font-size:12.5px}
+.kvr:last-child{border-bottom:none}
+.kvr > div{box-sizing:border-box}
+.cbx{width:36px;display:flex;align-items:center;justify-content:center}
+.cbx i{width:14px;height:14px;border-radius:3px;background:var(--dt-accent);
+  position:relative;display:block}
+.cbx i::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+  border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.cbx.off i{background:var(--dt-surface);border:1px solid var(--dt-border-strong)}
+.c1{width:340px;padding-left:14px}
+.c2{flex:1}
+.fld{width:300px;height:26px;border:1px solid var(--dt-accent);border-radius:6px;
+  background:var(--dt-surface)}
+.fld2{width:300px;height:26px;border:1px solid transparent;border-radius:6px}
+.blank{color:var(--dt-text-subtle)}
+.fold{height:34px;display:flex;align-items:center;gap:7px;padding:0 12px;font-size:12.5px;
+  color:var(--dt-text-muted)}
+.tri{font-size:9px;color:var(--dt-text-subtle)}
+.note{background:var(--dt-surface);border:1px solid var(--dt-border);border-left:3px solid var(--dt-accent);
+  border-radius:0 8px 8px 0;padding:11px 15px;font-size:12.5px;color:var(--dt-text-muted);
+  margin:12px 0}
+.q{background:var(--dt-surface);border:1px solid var(--dt-border);border-radius:8px;
+  padding:13px 16px;margin:10px 0}
+.q .qh{font-size:13px;font-weight:600;margin-bottom:7px}
+.q .qh span{color:var(--dt-accent);margin-right:6px;font-family:var(--mono)}
+.q ul{margin:6px 0 0 18px;font-size:12.5px;color:var(--dt-text-muted)}
+.q li{margin:3px 0}
+.q .rec{color:#167a4a;font-weight:600}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:1320px){.cols{grid-template-columns:1fr}}
+.fig{font-size:11.5px;color:var(--dt-text-subtle);margin-top:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>批处理「① 请求模板」段 — 对齐单一请求页样式<span class="badge">待审核 v1</span></h1>
+<p class="sub">范围：仅 <code>BatchPanel</code> 段①。不动段② CSV、段③ 执行配置与结果，不动三段折叠模型。<br>
+画布 1266×763 按真实窗口 1:1；右侧标尺为各区域实测高度，标签数字与该行高度一一对应。</p>
+
+<h2>1 · 诊断</h2>
+<p class="note"><b>根因一句话</b>：段① 还在用「表单面板」的控件词汇（左标签 + 下拉 + 收起式 TitledPane），
+而单一请求页已换成「请求编辑器」的词汇（请求行 + 页签 + 分段控件 + 工具行），两页没共用同一套编辑器组件。</p>
+
+<table>
+<tr><th style="width:130px">维度</th><th>批处理段①（现状）</th><th>单一请求页（目标）</th></tr>
+<tr><td>地址</td><td><code>field("请求地址模板", …)</code> 左标签 + 方法 + URL</td><td>无标签，方法与 URL 同一条横带</td></tr>
+<tr><td>请求体类型</td><td><code>ComboBox</code> 下拉（宽 180）</td><td><code>ToggleGroup</code> 分段控件</td></tr>
+<tr><td>请求头</td><td>收起的 <code>TitledPane</code>，藏在最下面</td><td>独立页签，与 Body 平级</td></tr>
+<tr><td>占位符说明</td><td>没有</td><td>内联在请求行右端</td></tr>
+<tr><td>降级说明</td><td>跟在「请求体类型」下拉右侧</td><td>跟在分段控件右侧（同一做法）</td></tr>
+</table>
+
+<h3>现状竖向账（段① ≈ 190px）</h3>
+<table>
+<tr><th>区域</th><th style="width:70px;text-align:right">px</th><th>备注</th></tr>
+<tr><td>请求地址模板（标签 32 档）</td><td class="n">32</td><td></td></tr>
+<tr><td>请求体类型（标签 32 档）</td><td class="n">32</td><td></td></tr>
+<tr><td>请求体模板 TextArea</td><td class="n">48</td><td>约 3 行</td></tr>
+<tr><td>请求头 TitledPane（收起）</td><td class="n">38</td><td></td></tr>
+<tr><td>正文间距 8×3</td><td class="n">24</td><td></td></tr>
+<tr><td>正文上下内边距 8×2</td><td class="n">16</td><td><code>.stage-body-compact</code></td></tr>
+<tr class="tot"><td>合计</td><td class="n">190</td><td></td></tr>
+</table>
+
+<h2>2 · 方案：段① 换成「请求行 + 页签」</h2>
+<p class="cap"><b>设计稿 · 配置态 · Body 页签</b> —— 与单一请求页同一套控件：方法+URL 一条横带、
+三页签、工具行里分段控件 + Content-Type + 动作槽。</p>
+
+<div class="canvas">
+<div class="app">
+  <div class="sb">
+    <div class="t">ToolNest</div><div class="i">工具巢</div>
+    <div class="it">编码 / 解码</div><div class="it">文本对比</div>
+    <div class="it on">HTTP 请求工具</div><div class="it">二维码</div>
+    <div class="it">时间戳</div><div class="it">文件哈希</div>
+  </div>
+
+  <div class="main">
+    <div class="hd">
+      <div class="l1">网络请求工具 › HTTP 请求工具</div>
+      <div class="l2"><span class="back">返回</span>HTTP 请求工具</div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="tabs">
+      <div class="tab">单一请求</div>
+      <div class="tab on">批处理</div>
+      <div class="gap"></div>
+      <div class="tab" style="font-size:12px">用当前请求作为批处理模板</div>
+    </div>
+
+    <!-- 段① -->
+    <div class="card" style="position:relative">
+      <div class="ch">① 请求模板</div>
+      <div class="cb">
+        <!-- 请求行 36 -->
+        <div style="height:36px;display:flex;align-items:center;gap:8px">
+          <div class="method">GET<span class="caret">▾</span></div>
+          <div class="url">https://api.example.com/order?orderId={orderId}</div>
+          <div class="hint">URL 与请求体支持 {列名} 占位符</div>
+        </div>
+        <!-- 页签轨道 42 -->
+        <div class="inner-tabs" style="margin-top:8px">
+          <div class="it">Params</div>
+          <div class="it">Headers (2)</div>
+          <div class="it on">Body · JSON</div>
+        </div>
+        <!-- 工具行 38 -->
+        <div style="height:38px;display:flex;align-items:center;gap:8px">
+          <div class="seg">
+            <div class="si">无</div><div class="si on">JSON</div>
+            <div class="si">Form</div><div class="si">XML</div><div class="si">Text</div>
+          </div>
+          <div class="ct">application/json; charset=UTF-8</div>
+          <div class="gap"></div>
+          <div class="btn">格式化</div>
+        </div>
+        <!-- 编辑器 48 -->
+        <div class="editor" style="height:48px;overflow:hidden">{
+  "orderId": "{orderId}",
+  "userId": "{userId}"
+}</div>
+      </div>
+      <div class="rlab" style="top:38px">请求行 36</div>
+      <div class="rlab" style="top:82px">页签 42</div>
+      <div class="rlab" style="top:132px">工具行 38</div>
+      <div class="rlab" style="top:178px">编辑器 48</div>
+      <div class="rlab" style="top:234px">段① 244</div>
+      <div class="ruler">
+        <div class="rl" style="height:86px">86</div>
+        <div class="rl" style="height:48px">48</div>
+        <div class="rl" style="height:244px">244</div>
+        <div class="rl" style="height:10px">10</div>
+        <div class="rl" style="height:38px">38</div>
+        <div class="rl" style="height:10px">10</div>
+        <div class="rl" style="height:340px">340</div>
+      </div>
+    </div>
+
+    <!-- 段② -->
+    <div class="card">
+      <div class="ch">② CSV 数据<span style="color:var(--dt-text-subtle);font-weight:400">（已导入 3 行）</span></div>
+    </div>
+
+    <!-- 段③ -->
+    <div class="card" style="height:302px">
+      <div class="ch">③ 执行配置与结果</div>
+    </div>
+  </div>
+</div>
+</div>
+<p class="fig">左：设计稿（Body · JSON 页签）。右侧标尺逐段标注高度；紫色标签是该区域的实测值。</p>
+
+<h3>Body 类型选「无」时的降级态</h3>
+<p class="cap">同一位换 <code>无</code> —— 编辑区降透明 42%，分段控件右侧明写原因（不只靠颜色）。</p>
+<div class="canvas">
+<div class="app">
+  <div class="sb"><div class="t">ToolNest</div><div class="i">工具巢</div>
+    <div class="it">编码 / 解码</div><div class="it">文本对比</div>
+    <div class="it on">HTTP 请求工具</div><div class="it">二维码</div></div>
+  <div class="main"><div class="hd"><div class="l1">网络请求工具 › HTTP 请求工具</div>
+    <div class="l2"><span class="back">返回</span>HTTP 请求工具</div></div></div>
+  <div class="body">
+    <div class="tabs"><div class="tab">单一请求</div><div class="tab on">批处理</div>
+      <div class="gap"></div><div class="tab" style="font-size:12px">用当前请求作为批处理模板</div></div>
+    <div class="card">
+      <div class="ch">① 请求模板</div>
+      <div class="cb">
+        <div style="height:36px;display:flex;align-items:center;gap:8px">
+          <div class="method">GET<span class="caret">▾</span></div>
+          <div class="url">https://api.example.com/order?orderId={orderId}</div>
+          <div class="hint">URL 与请求体支持 {列名} 占位符</div>
+        </div>
+        <div class="inner-tabs" style="margin-top:8px">
+          <div class="it">Params</div><div class="it">Headers (2)"></div>
+          <div class="it">Body</div>
+        </div>
+        <div style="height:38px;display:flex;align-items:center;gap:8px">
+          <div class="seg"><div class="si on">无</div><div class="si">JSON</div>
+            <div class="si">Form</div><div class="si">XML</div><div class="si">Text</div></div>
+          <div class="dnote">此项不生效（请求体类型为「无」）</div>
+          <div class="gap"></div>
+        </div>
+        <div class="editor deg">（未选择请求体类型）</div>
+      </div>
+    </div>
+    <div class="card"><div class="ch">② CSV 数据</div></div>
+    <div class="card" style="height:302px"><div class="ch">③ 执行配置与结果</div></div>
+  </div>
+</div>
+</div>
+<p class="fig">降级态：编辑器降透明但<b>没有</b>被 setDisable，右侧有黄色原因说明。</p>
+
+<h3>Headers 页签（复用刚做完的键值表工具行）</h3>
+<p class="fig">列宽合计 899 = 容器内宽（外宽 901 − 上下边框 1×2）。
+差这 2px 肉眼看不出来，但列和超了会被 <code>overflow:hidden</code> 悄悄裁掉最后一列。</p>
+<div class="canvas">
+<div class="app">
+  <div class="sb"><div class="t">ToolNest</div><div class="i">工具巢</div>
+    <div class="it">编码 / 解码</div><div class="it">文本对比</div>
+    <div class="it on">HTTP 请求工具</div><div class="it">二维码</div></div>
+  <div class="main"><div class="hd"><div class="l1">网络请求工具 › HTTP 请求工具</div>
+    <div class="l2"><span class="back">返回</span>HTTP 请求工具</div></div></div>
+  <div class="body">
+    <div class="tabs"><div class="tab">单一请求</div><div class="tab on">批处理</div>
+      <div class="gap"></div><div class="tab" style="font-size:12px">用当前请求作为批处理模板</div></div>
+    <div class="card">
+      <div class="ch">① 请求模板</div>
+      <div class="cb">
+        <div style="height:36px;display:flex;align-items:center;gap:8px">
+          <div class="method">GET<span class="caret">▾</span></div>
+          <div class="url">https://api.example.com/order?orderId={orderId}</div>
+          <div class="hint">URL 与请求体支持 {列名} 占位符</div>
+        </div>
+        <div class="inner-tabs" style="margin-top:8px">
+          <div class="it">Params</div><div class="it on">Headers (2)</div><div class="it">Body</div>
+        </div>
+        <div style="height:38px;display:flex;align-items:center;gap:8px">
+          <div class="btn">+ JSON</div><div class="btn">+ Token</div>
+          <div class="btn">+ 新增请求头</div><div class="btn">清空</div>
+          <div class="gap"></div><div class="hint">常用请求头</div>
+        </div>
+        <div class="kv">
+          <div class="kvh">KEY<span style="flex:1"></span>VALUE</div>
+          <div class="kvr"><div class="cbx"><i></i></div><div class="c1">Authorization</div>
+            <div class="c2"><div class="fld2">Bearer eyJhbGciOiJIUzI1NiJ9…</div></div></div>
+          <div class="kvr"><div class="cbx"><i></i></div><div class="c1">X-Tenant-Id</div>
+            <div class="c2"><div class="fld2">{tenantId}</div></div></div>
+          <div class="kvr"><div class="cbx"><i></i></div><div class="c1 blank"></div>
+            <div class="c2"><div class="fld"></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card"><div class="ch">② CSV 数据</div></div>
+    <div class="card" style="height:302px"><div class="ch">③ 执行配置与结果</div></div>
+  </div>
+</div>
+</div>
+<p class="fig">Headers 页签：工具行与单一请求页逐字一致（<code>+ JSON</code> / <code>+ Token</code> / <code>+ 新增请求头</code> / <code>清空</code>）。
+第三行是常驻的空白录入行，末尾恰好留一行。</p>
+
+<h2>3 · 面积预算表（本方案成立的前提）</h2>
+<table>
+<tr><th>区域</th><th style="width:70px;text-align:right">px</th><th>备注</th></tr>
+<tr><td>请求行（方法 36 + URL 36，同一行）</td><td class="n">36</td><td>说明文字内联在右端，不额外占一行</td></tr>
+<tr><td>页签轨道</td><td class="n">42</td><td>轨 38 + 下留白 4</td></tr>
+<tr><td>工具行（分段控件 + Content-Type + 动作槽）</td><td class="n">38</td><td><code>.http-type-seg</code> 抬到 32 与工具行等高</td></tr>
+<tr><td>请求体编辑器（JSON 文本区）</td><td class="n">48</td><td>3 行，沿用现状口径（放 4 行则整页超预算，见下方说明）</td></tr>
+<tr><td>正文间距 8×3</td><td class="n">24</td><td>4 个子节点</td></tr>
+<tr><td>正文上下内边距 8×2</td><td class="n">16</td><td><code>.stage-body-compact</code> 沿用</td></tr>
+<tr class="tot"><td>段① 正文合计</td><td class="n">204</td><td>36+42+38+48+24+16</td></tr>
+<tr><td>卡片头 + 边框</td><td class="n">40</td><td>头 38 + 上下边框 1×2</td></tr>
+<tr class="tot"><td>段① 卡片实测高</td><td class="n">244</td><td>浏览器实测 244（已对账）</td></tr>
+</table>
+
+<table style="margin-top:14px">
+<tr><th>整页一屏校验</th><th style="width:70px;text-align:right">px</th><th>备注</th></tr>
+<tr><td>页头</td><td class="n">86</td><td>不变</td></tr>
+<tr><td>单一/批处理页签行</td><td class="n">48</td><td>不变</td></tr>
+<tr><td>段① 请求模板</td><td class="n">244</td><td>本方案（浏览器实测）</td></tr>
+<tr><td>间距</td><td class="n">10</td><td></td></tr>
+<tr><td>段② CSV 数据（收起）</td><td class="n">38</td><td></td></tr>
+<tr><td>间距</td><td class="n">10</td><td></td></tr>
+<tr><td>段③ 执行配置与结果</td><td class="n">340</td><td><code>RESULT_MIN_H</code> 预留，不变</td></tr>
+<tr class="tot"><td>合计</td><td class="n">642</td><td class="ok">≤ 653，一屏内，余 11px</td></tr>
+</table>
+
+<div class="note" style="border-left-color:var(--dt-warning)">
+<b>两处必须说清的取舍（都是浏览器实测后才发现的）</b><br>
+<b>① 占位符说明必须内联。</b>把它单起一行是 264px，整页超预算。
+内联到请求行右端（36px 那行里，不额外占高）才落进一屏 ——
+单一请求页本来就是这么做的（<code>statusBox</code> 与请求行同行），不是权宜之计。<br>
+<b>② 请求体编辑器只能给 3 行（48px）。</b>最初画的是 4 行（76px），
+但段① 卡片实测 272px → 整页 670px，<b>超预算 17px</b>，段③ 底部会被切掉一小截。
+回到 3 行后段① 244px、整页 642px，<b>余 11px</b>。
+（这正是「结构断言全绿 ≠ 长得对」：四个子节点都在、样式也对，
+但竖向账在浏览器里才暴露出来。）
+</div>
+
+<h2>4 · 不变量</h2>
+<table>
+<tr><th>规则</th><th>证据</th></tr>
+<tr><td>装不下只滚动，不压缩</td><td>段① 不设 <code>max-height</code>，四行按 pref 自然生长</td></tr>
+<tr><td>禁用态必须配文字</td><td>类型选「无」时编辑器降透明 42% + 分段控件右侧明写「此项不生效」</td></tr>
+<tr><td>颜色永不是唯一线索</td><td>降级同时有文字说明，不只靠变淡</td></tr>
+<tr><td>整页一屏</td><td>630 ≤ 653（见 §3）</td></tr>
+<tr><td>段②③ 不受影响</td><td>本轮只改段① 内部结构</td></tr>
+<tr><td>不给出点了会出错的入口</td><td>分段控件只列 <code>batchTypes()</code> 的 5 项，不含 Form-data / Binary</td></tr>
+</table>
+
+<h2>5 · 需你拍板的三个取舍</h2>
+
+<div class="q">
+  <div class="qh"><span>Q1</span>批处理页要不要新增 <code>Params</code> 页签？</div>
+  <p style="font-size:12.5px;color:var(--dt-text-muted)">单一请求页有 <code>Params</code>（query 参数）。
+  批处理页现在没有，但 CSV 场景下「地址里带 <code>{列名}</code>、想单独列 query 参数」很常见。</p>
+  <ul>
+    <li><b>A（推荐）</b>：加。与单一请求页三页签完全对齐 conceptually，迁移心智成本最低</li>
+    <li><b>B</b>：不加，只做 <code>Headers</code> / <code>Body</code> 两页签，少一层嵌套</li>
+  </ul>
+</div>
+
+<div class="q">
+  <div class="qh"><span>Q2</span>段① 要不要取消折叠？</div>
+  <p style="font-size:12.5px;color:var(--dt-text-muted)">段① 现在可折叠，收起时头带显示
+  <code>GET&nbsp;&nbsp;https://…</code> 摘要。导入 CSV 与开始执行时都会自动收起它，是既定流程。</p>
+  <ul>
+    <li><b>A（推荐）</b>：保留。摘要在执行中很有用 —— 三段都收起时仍能读出「请求长什么样」</li>
+    <li><b>B</b>：取消常驻展开，省掉头带 38px（段① 变 194px），但失去摘要</li>
+  </ul>
+</div>
+
+<div class="q">
+  <div class="qh"><span>Q3</span>「请求体类型」下拉换成 5 项分段控件会不会太挤？</div>
+  <p style="font-size:12.5px;color:var(--dt-text-muted)">批处理页实际只支持 5 种
+  （<code>batchTypes()</code> 不含 <code>FORM_DATA</code> / <code>BINARY</code> ——
+  它们只有「路径」没有「值」，<code>{列名}</code> 占位符在它们身上没有意义）。
+  设计稿按 5 项画，宽度 5×~54 + 内边距 ≈ 290px，内容区 936 宽，放得下。</p>
+  <ul>
+    <li><b>A（推荐）</b>：只列 5 项，不给点了会出错的入口</li>
+    <li><b>B</b>：列全 7 项与单一请求页一致，点了提示「该类型不支持占位符」</li>
+  </ul>
+</div>
+
+<h2>6 · 批准后的改动清单</h2>
+<table>
+<tr><th>文件</th><th>改动</th></tr>
+<tr><td><code>BatchPanel.java</code></td><td>段① 内部结构换成 请求行 + TabPane + 工具行；<code>bodyTypeBox</code> 换成分段控件</td></tr>
+<tr><td><code>BatchPanel.java</code></td><td>若 Q1 选 A，新增 <code>paramsTable</code></td></tr>
+<tr><td><code>app.css</code></td><td>复用 <code>.http-type-seg</code>；段① 页签复用 <code>.http-req-tabs</code> 的轨道与字号</td></tr>
+<tr><td><code>HttpBatchLayoutProbe.java</code></td><td>段① 断言按新结构更新（<b>1:1 替换，不减计数</b>）</td></tr>
+</table>
+
+<h3>验收口径</h3>
+<table>
+<tr><th>项</th><th>判据</th></tr>
+<tr><td>竖向</td><td>段① 232、整页 630、段③ 底部 y ≤ 653</td></tr>
+<tr><td>降级</td><td>类型选「无」时编辑器降透明 + 右侧原因文字在位</td></tr>
+<tr><td>反向验证</td><td>把段① 撑高 38px，<code>httplayout</code> 必须转红</td></tr>
+<tr><td>肉眼</td><td>分段控件与工具行等高、页签标题带项数、四按钮工具行不挤</td></tr>
+</table>
+
+</div>
+</body>
+</html>

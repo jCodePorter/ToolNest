@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ToolNest 工具巢 · HTTP 批处理页 版式候选对比</title>
+<style>
+/* ============================================================
+ 评审页外壳（不是产品界面，只是给设计图套一层说明用的纸）
+ 复用 design/http-batch-redesign.html 的评审页外壳
+ ============================================================ */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+ background:#eef1f5;
+ font-family:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI","PingFang SC",sans-serif;
+ font-size:13px;color:#16181d;-webkit-font-smoothing:antialiased;
+}
+.page{max-width:1540px;margin:0 auto;padding:28px 32px 80px}
+.doc-head{border-bottom:0}
+.doc-head h1{margin:0 0 8px;font-size:23px;font-weight:700;letter-spacing:0}
+.doc-head p{margin:0;font-size:12px;color:#5a6169;line-height:1.9}
+.doc-head code{font-family:"Cascadia Mono","Consolas",monospace;font-size:11.5px;background:#fff;border:1px solid #e6eaef;border-radius:4px;padding:1px 5px}
+.doc-head h1 .idx{color:#8b929c;font-weight:700;margin-right:8px;font-family:"Cascadia Mono",monospace;font-size:13px}
+section{background:#fff;border:1px solid #e6eaef;border-radius:12px;padding:22px 24px;margin-bottom:22px}
+section>h2{margin:0 0 6px;font-size:15px;font-weight:700}
+section>h2 .idx{color:#8b929c;font-weight:700;margin-right:8px;font-family:"Cascadia Mono",monospace;font-size:13px}
+section>p.lead{margin:0 0 20px;font-size:12px;color:#5a6169;line-height:1.95}
+h3.sub{margin:26px 0 10px;font-size:13px;font-weight:700}
+h3.sub:first-of-type{margin-top:8px}
+.note{font-size:12px;color:#5a6169;line-height:1.95}
+.note b{color:#16181d}
+.kv-tip{background:#fafbfc;border:1px dashed #d2d7de;border-radius:8px;padding:10px 12px;font-size:12px;color:#5a6169;line-height:1.9;margin:10px 0}
+.kv-tip b{color:#16181d}
+/* ============================================================
+ 产品界面令牌（与 src/main/resources/css/app.css 的 .root 一一对应，值一律 #rrggbb）
+ —— 定义在 :root 全局作用域（评审页任意块均可安全引用），.win / .zoom 保留同名声明；
+    组件层只引用变量名，不出现零散硬编码色值。
+ ============================================================ */
+:root,.win,.zoom{
+ --dt-canvas:#f2f4f7;
+ --dt-content-bg:#f8f9fb;
+ --dt-surface:#ffffff;
+ --dt-surface-alt:#fafbfc;
+ --dt-surface-sunken:#f2f4f7;
+ --dt-surface-hover:#e8ecf2;
+ --dt-border:#e6eaef;
+ --dt-border-faint:#f0f3f7;
+ --dt-border-strong:#d2d7de;
+ --dt-text:#16181d;
+ --dt-text-muted:#5a6169;
+ --dt-text-subtle:#8b929c;
+ --dt-text-invert:#ffffff;
+ --dt-accent:#2563eb;
+ --dt-accent-hover:#1d4fd7;
+ --dt-accent-pressed:#1843bd;
+ --dt-accent-soft:#eaf0fe;
+ --dt-accent-border:#b8cdfb;
+ --dt-success:#167a4a;
+ --dt-warning:#a1590a;
+ --dt-danger:#c33333;
+ --dt-danger-soft:#fdf1f1;
+ --dt-danger-border:#f0c4c4;
+ --dt-warning-soft:#fdf6ec;
+ --dt-segmented-track:#eef1f5;
+ --dt-segmented-thumb:#ffffff;
+ --dt-segmented-edge:#dfe4ea;
+ --dt-neutral-chip:#e7eaef;
+ --dt-row-alt:#fcfcfd;
+ --dt-row-hover:#f5f7fa;
+ --dt-selection:#cfe0fd;
+ --dt-scrollbar:#b3bac4;
+ --dt-scrollbar-hover:#8b929c;
+ --ui-font:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI","PingFang SC",sans-serif;
+ --mono-font:"Cascadia Mono","Consolas","Microsoft YaHei UI",monospace;
+}
+
+/* ---------- 画布：固定尺寸，不变形不缩放 ---------- */
+.stage{display:flex;align-items:flex-start}
+.win{
+ position:relative;flex:0 0 auto;
+ width:1266px;height:763px;overflow:hidden;
+ display:flex;
+ background:var(--dt-canvas);
+ box-shadow:0 0 0 1px var(--dt-border-strong);border-radius:10px;
+ font-family:var(--ui-font);font-size:13px;color:var(--dt-text);
+ line-height:1.5;
+}
+.win--wide{width:1920px;height:1080px}
+.ic{stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ic-14{width:14px;height:14px}
+.ic-15{width:15px;height:15px}
+.ic-16{width:16px;height:16px}
+.ic-18{width:18px;height:18px}
+
+/* ---------- 侧边栏 268px ---------- */
+.sb{flex:0 0 268px;width:268px;background:var(--dt-canvas);border-right:1px solid var(--dt-border);display:flex;flex-direction:column;padding:0 10px 8px}
+.brand{height:54px;display:flex;align-items:center;gap:9px;padding:0 6px;flex:0 0 54px}
+.brand .mk{width:27px;height:27px;border-radius:8px;background:var(--dt-accent-soft);color:var(--dt-accent);display:flex;align-items:center;justify-content:center;flex:0 0 27px}
+.brand .nm{font-size:16px;font-weight:700;letter-spacing:.2px}
+.sb-all{height:34px;display:flex;align-items:center;gap:8px;padding:0 8px 0 11px;border-radius:6px;color:var(--dt-text);font-size:13px;background:var(--dt-accent-soft);position:relative}
+.sb-all::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--dt-accent)}
+.sb-all .cnt{margin-left:auto;background:var(--dt-neutral-chip);color:var(--dt-text-muted);font-size:11px;font-weight:700;border-radius:99px;padding:1px 7px;line-height:1.5}
+.sb-search{height:36px;margin:8px 0 10px;display:flex;align-items:center;gap:8px;padding:0 10px 0 34px;position:relative;background:var(--dt-surface);border:1px solid var(--dt-segmented-edge);border-radius:8px;color:var(--dt-text-subtle);font-size:13px}
+.sb-search .mag{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--dt-text-subtle)}
+.sb-list{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:1px}
+.sb-folder{height:32px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:6px;font-size:13px;color:var(--dt-text)}
+.sb-folder .car{color:var(--dt-text-subtle);width:14px}
+.sb-folder .cnt{margin-left:auto;color:var(--dt-text-subtle);font-size:11px;font-weight:700}
+.sb-kids{margin:1px 0 2px 15px;padding-left:11px;border-left:1px solid var(--dt-border);display:flex;flex-direction:column;gap:1px}
+.sb-kid{height:32px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:6px;font-size:13px;color:var(--dt-text-muted)}
+.sb-kid.on{background:var(--dt-accent-soft);color:var(--dt-text)}
+.sb-kid .kic{color:var(--dt-text-subtle);width:14px}
+.sb-kid.on .kic{color:var(--dt-accent)}
+
+/* ---------- 内容区 约998px ---------- */
+.cn{flex:1;min-width:0;background:var(--dt-content-bg);display:flex;flex-direction:column;overflow:hidden}
+.pg-head{flex:0 0 62px;height:62px;background:var(--dt-surface);border-bottom:1px solid var(--dt-border);padding:0 24px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.crumb{display:flex;align-items:center;gap:9px;height:24px;font-size:12px;color:var(--dt-text-muted)}
+.crumb .back{width:22px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--dt-text-muted)}
+.pg-title{font-size:23px;font-weight:700;line-height:27px}
+.tabrow{flex:0 0 48px;height:48px;background:var(--dt-surface);border-bottom:1px solid var(--dt-border);padding:0 24px;display:flex;align-items:center;gap:12px}
+.sp{margin-left:auto}
+
+/* 外层胶囊页签（浅底轨道 + 白色滑块） */
+.seg{height:32px;background:var(--dt-segmented-track);border:1px solid var(--dt-segmented-edge);border-radius:8px;padding:2px;display:flex;align-items:center;gap:2px}
+.seg .it{height:26px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:6px;font-size:13.5px;color:var(--dt-text-muted);white-space:nowrap}
+.seg .it.on{background:var(--dt-segmented-thumb);color:var(--dt-text);font-weight:700;box-shadow:0 1px 2px rgba(22,24,29,.10)}
+
+/* ---------- 按钮四级 ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;font-family:var(--ui-font);font-size:13px;line-height:1;white-space:nowrap;padding:0 12px;height:32px}
+.btn.h36{height:36px}
+.btn.h30{height:30px;border-radius:7px;padding:0 10px}
+.btn.h28{height:28px;border-radius:7px;padding:0 9px;font-size:12px}
+.btn-primary{background:var(--dt-accent);color:var(--dt-text-invert);font-weight:700;border:1px solid var(--dt-accent)}
+.btn-secondary{background:var(--dt-surface);color:var(--dt-text);border:1px solid var(--dt-border-strong)}
+.btn-quiet{background:transparent;color:var(--dt-accent);border:1px solid transparent}
+.btn-danger{background:var(--dt-surface);color:var(--dt-danger);border:1px solid var(--dt-danger-border)}
+.btn .g{color:currentColor}
+
+/* ---------- 卡片 ---------- */
+.card{background:var(--dt-surface);border:1px solid var(--dt-border);border-radius:11px;padding:16px;display:flex;flex-direction:column;min-height:0}
+.card-head{flex:0 0 34px;height:34px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--dt-border-faint)}
+.card-title{font-size:13px;font-weight:700}
+.card-cap{margin-left:auto;font-size:12px;color:var(--dt-text-subtle);font-family:var(--mono-font)}
+.card-cap.plain{font-family:var(--ui-font)}
+
+/* ---------- 表单控件 ---------- */
+.inp{height:32px;display:flex;align-items:center;gap:8px;background:var(--dt-surface);border:1px solid var(--dt-border-strong);border-radius:8px;padding:0 10px;font-size:13px;color:var(--dt-text);min-width:0}
+.inp.h36{height:36px}
+.inp.mono,.mono{font-family:var(--mono-font)}
+.inp.ph{color:var(--dt-text-subtle)}
+.sel{position:relative;justify-content:space-between}
+.sel .cv{color:var(--dt-text-subtle)}
+.num{height:32px;display:flex;align-items:center;background:var(--dt-surface);border:1px solid var(--dt-border-strong);border-radius:8px;overflow:hidden}
+.num .v{flex:1;text-align:center;font-family:var(--mono-font);font-size:13px}
+.ta{background:var(--dt-surface);border:1px solid var(--dt-border-strong);border-radius:8px;padding:8px 10px;font-family:var(--mono-font);font-size:13px;line-height:19px;color:var(--dt-text);white-space:pre;overflow:hidden}
+.fld{display:flex;align-items:center;gap:10px;min-width:0}
+.fldlab{flex:0 0 84px;font-size:12px;color:var(--dt-text-muted)}
+.grow{flex:1;min-width:0}
+.dim{opacity:.42}
+
+/* ---------- 执行条 ---------- */
+.execbar{display:flex;flex-direction:column;gap:8px;box-shadow:inset 0 1px 0 var(--dt-border-faint);margin-top:8px}
+.execbar.r1{flex:0 0 36px;height:36px}
+.execbar.r2{flex:0 0 80px;height:80px}
+.execbar.r3{flex:0 0 124px;height:124px}
+.exline{height:36px;flex:0 0 36px;display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}
+.exline .seg{flex:0 0 108px;width:108px;height:32px}
+.exline .seg .it{flex:1;justify-content:center;padding:0;gap:0}
+.exline .grp{display:flex;align-items:center;gap:4px}
+.exline .olab{font-size:11px;color:var(--dt-text-muted)}
+.exline .num{flex:0 0 64px;width:64px}
+.exline .unit{font-size:11px;color:var(--dt-text-subtle);font-family:var(--mono-font)}
+.exline .btn{padding:0;justify-content:center}
+.exline .btn-primary{flex:0 0 116px;width:116px;margin-left:auto}
+.exline .btn-quiet{flex:0 0 56px;width:56px}
+
+/* ---------- 表格 ---------- */
+.tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.tbl th{height:28px;background:var(--dt-surface-alt);color:var(--dt-text-subtle);font-size:11px;font-weight:700;text-align:left;padding:0 10px;border-bottom:1px solid var(--dt-border);white-space:nowrap}
+.tbl td{height:34px;padding:0 10px;font-size:12.5px;color:var(--dt-text-muted);border-bottom:1px solid var(--dt-border-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tbl tbody tr:nth-child(even) td{background:var(--dt-row-alt)}
+.tbl td.mono{font-family:var(--mono-font)}
+.tbl td.s-ok{color:var(--dt-success);font-weight:700}
+.tbl td.s-fail{color:var(--dt-danger);font-weight:700}
+.tbl td.s-pend{color:var(--dt-text-subtle)}
+.tbl td.s-ok,.tbl td.s-fail,.tbl td.s-pend{font-family:var(--mono-font)}
+.tbl tr.row-sel td{background:var(--dt-accent-soft)}
+.tbl tr.row-sel td:first-child{box-shadow:inset 3px 0 0 var(--dt-accent)}
+
+/* ---------- 代码 / JSON ---------- */
+.code{font-family:var(--mono-font);font-size:13px;line-height:20px;color:var(--dt-text);overflow:hidden;white-space:pre;padding:8px 12px}
+.code .k{font-weight:700}
+.code .s{color:var(--dt-success)}
+.code .n{color:var(--dt-accent)}
+.code-wrap{position:relative;flex:1;min-height:0;background:var(--dt-surface);border:1px solid var(--dt-border);border-radius:8px;overflow:hidden}
+.code-wrap .copy{position:absolute;right:8px;top:8px}
+
+/* ---------- 内层数据页签：文字 + 2px 主色下划线 ---------- */
+.itabs{display:flex;align-items:center;gap:20px;padding:0 2px;border-bottom:1px solid var(--dt-border)}
+.itab{height:29px;display:flex;align-items:center;font-size:12px;color:var(--dt-text-muted);box-shadow:inset 0 -2px 0 transparent}
+.itab.on{color:var(--dt-text);font-weight:700;box-shadow:inset 0 -2px 0 var(--dt-accent)}
+
+/* ---------- 结果头带 40px ---------- */
+.rhead{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--dt-border)}
+.rhead .rt{font-size:13px;font-weight:700;flex:0 0 auto;white-space:nowrap}
+.rhead .cnt{font-size:12px;color:var(--dt-text-muted);font-family:var(--mono-font);white-space:nowrap}
+.prog{width:150px;height:6px;border-radius:99px;background:var(--dt-neutral-chip);overflow:hidden;flex:0 0 auto}
+.prog>i{display:block;height:100%;background:var(--dt-accent)}
+.stat{font-size:12px;color:var(--dt-text-muted);font-family:var(--mono-font);white-space:nowrap}
+.stat .ok{color:var(--dt-success)}
+.stat .bad{color:var(--dt-danger)}
+
+/* ---------- 分栏 ---------- */
+.split{flex:1;min-height:0;display:flex;border:1px solid var(--dt-border);border-radius:9px;overflow:hidden;background:var(--dt-surface)}
+.split .L{flex:0 0 62%;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.split .bar{flex:0 0 1px;background:var(--dt-border)}
+.split .R{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.tblwrap{flex:1;min-height:0;overflow:hidden;position:relative}
+
+/* ---------- 标注层 ---------- */
+.anno{position:absolute;display:flex;align-items:center;gap:6px;pointer-events:none;z-index:6}
+.bdg{min-width:18px;height:18px;padding:0 4px;border-radius:5px;background:var(--dt-danger);color:#ffffff;font-size:11px;font-weight:700;font-family:var(--mono-font);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px #ffffff}
+.alab{font-size:11px;font-weight:700;color:var(--dt-danger);background:#ffffff;border:1px solid var(--dt-danger-border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+.redbox{position:absolute;border:1.5px solid var(--dt-danger);border-radius:6px;pointer-events:none;z-index:5}
+.redbox.dash{border-style:dashed}
+/* 纵向尺寸尺 */
+.ruler{margin-left:10px;margin-top:1px;display:flex;flex-direction:column;flex:0 0 auto;font-family:var(--mono-font);font-size:10.5px;color:#5a6169}
+.ruler .rh{font-size:10.5px;font-weight:700;color:#8b929c;margin-bottom:4px;white-space:nowrap}
+.rseg{position:relative;border-left:1px solid #d2d7de;border-right:1px solid #d2d7de;border-top:1px solid #d2d7de;display:flex;align-items:center;padding-left:6px;white-space:nowrap}
+.rseg:last-child{border-bottom:1px solid #d2d7de}
+.rseg.hi{background:#eaf0fe;color:#2563eb;font-weight:700}
+.rseg.bad{background:#fdeeee;color:#c33333;font-weight:700}
+/* 版式候选：画布与栏 */
+.vbody{flex:1;min-height:0;padding:0 24px 0;display:flex;gap:14px;overflow:hidden}
+.vcol{min-width:0;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.vcol.fill{flex:1}
+/* 顶部横向宽度尺（占满该栏宽） */
+.wruler{display:flex;height:16px;margin-bottom:2px;font-family:var(--mono-font);font-size:10.5px;color:#5a6169;flex:0 0 16px}
+.wruler i{flex:1;border:1px solid #d2d7de;border-bottom:0;display:flex;align-items:center;justify-content:center;font-style:normal;white-space:nowrap}
+.wruler i.bad{border-color:#e9b8b8;color:#c33333;font-weight:700;background:#fdeeee}
+.wruler i.ok{border-color:#bfe0cd;color:#167a4a;font-weight:700;background:#eef8f2}
+.wruler .wg{flex:0 0 14px;border:0;background:transparent}
+/* 画布上方的各栏宽度标注行（与画布各栏严格对齐） */
+.wruler-row{display:flex;gap:14px;height:16px;margin-bottom:3px;font-family:var(--mono-font);font-size:10.5px;color:#5a6169}
+.wruler-row i{flex:1;border:1px solid #d2d7de;border-bottom:0;display:flex;align-items:center;justify-content:center;font-style:normal;white-space:nowrap;overflow:hidden}
+.wruler-row i.bad{border-color:#e9b8b8;color:#c33333;font-weight:700;background:#fdeeee}
+.wruler-row i.ok{border-color:#bfe0cd;color:#167a4a;font-weight:700;background:#eef8f2}
+.wruler-row i.mut{border-color:#d2d7de;color:#5a6169}
+/* 表格底部横向滚动条 */
+.hbar{position:absolute;left:0;right:0;bottom:0;height:9px;background:var(--dt-surface-alt);border-top:1px solid var(--dt-border);z-index:4}
+.hbar i{position:absolute;top:2px;bottom:2px;left:2px;border-radius:4px;background:var(--dt-scrollbar)}
+/* 判定徽标（inline SVG + 文字） */
+.vb{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;white-space:nowrap}
+.vb .ic{stroke-width:2.6}
+.vb.ok{color:#167a4a}
+.vb.no{color:#c33333}
+.vb.warn{color:#a1590a}
+.vb .ic.w{stroke-width:2.3}
+/* 行内红/绿小标签（把问题就地标在图上） */
+.tb{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:#c33333;background:#fdeeee;border:1px solid #f0c4c4;border-radius:5px;padding:1px 5px;font-family:var(--mono-font);white-space:nowrap}
+.tb.ok{color:#167a4a;background:#eef8f2;border-color:#bfe0cd}
+.tb.warn{color:#a1590a;background:#fdf6ec;border-color:#f0dcb8}
+.tb.blue{color:#2563eb;background:#eaf0fe;border-color:#b8cdfb}
+/* 骨架块（标注真实 px 的方块图） */
+.sblk{display:flex;align-items:center;gap:8px;padding:0 12px;font-size:11.5px;color:#5a6169;overflow:hidden}
+.sblk .px{margin-left:auto;font-family:var(--mono-font);font-weight:700}
+.b-chrome{background:#eef1f5;border-bottom:1px solid #fff}
+.b-chrome2{background:#e7ebf1;border-bottom:1px solid #fff}
+.b-inp{background:#eaf0fe;border-bottom:1px solid #fff}
+.b-res{background:#f2f4f7;border-bottom:1px solid #fff}
+.b-res-hi{background:#dbe7fd;color:#1d4fd7;border-bottom:1px solid #fff}
+.b-gap{background:#fff}
+/* 行内判定小图标（inline SVG，不用字符勾叉） */
+.vs{width:13px;height:13px;display:inline-block;vertical-align:-2px;fill:none;stroke:currentColor;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}
+.vs.vok{color:#167a4a}
+.vs.vno{color:#c33333}
+/* 宽表横向滚动容器 */
+.tscroll{overflow-x:auto}
+/* V5：1920 画布的横向滚动容器 */
+.hscroll{overflow-x:auto;overflow-y:hidden;border:1px dashed #d2d7de;border-radius:10px;padding:12px;background:#fafbfc}
+/* 列宽尺（520 拆解） */
+.colruler{display:flex;height:46px;font-family:var(--mono-font);font-size:10.5px;align-items:stretch;margin:6px 0 4px;color:#5a6169}
+.colruler .c{border:1px solid #d2d7de;border-right:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden}
+.colruler .c:last-child{border-right:1px solid #d2d7de}
+.colruler .c b{font-size:11px;color:#16181d}
+.colruler .c.fx{background:#f2f4f7;color:#5a6169}
+.colruler .c.el{background:#eaf0fe;color:#2563eb}
+.colruler .tot{flex:0 0 132px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#16181d}
+.capbar{display:flex;flex-direction:column;gap:8px;margin:8px 0 4px}
+.capbar .row{display:flex;align-items:center;gap:10px}
+.capbar .lab{flex:0 0 168px;font-size:11.5px;color:#5a6169;text-align:right;font-family:var(--mono-font)}
+.capbar .bar{height:20px;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-family:var(--mono-font);font-size:11px;font-weight:700;color:#fff}
+.capbar .bar.need{background:#5a6169}
+.capbar .bar.ok{background:#167a4a}
+.capbar .bar.bad{background:#c33333}
+.capbar .gap{font-family:var(--mono-font);font-size:11px;color:#c33333;font-weight:700}
+/* ---------- 评审页通用表格 ---------- */
+.gt{width:100%;border-collapse:collapse;font-size:12px}
+.gt th{background:#fafbfc;border:1px solid #e6eaef;padding:7px 10px;text-align:left;font-size:11px;font-weight:700;color:#5a6169;white-space:nowrap}
+.gt td{border:1px solid #e6eaef;padding:7px 10px;color:#3b4048;vertical-align:top;line-height:1.7}
+.gt td.mono,.gt th.mono{font-family:"Cascadia Mono","Consolas",monospace}
+.gt td.n{text-align:right;font-family:"Cascadia Mono","Consolas",monospace;white-space:nowrap}
+.gt td.em{color:#c33333;font-weight:700}
+.gt td.ok{color:#167a4a;font-weight:700}
+.gt td.ac{color:#2563eb;font-weight:700}
+.gt tr.total td{background:#f8f9fb;font-weight:700;color:#16181d}
+.gt.sm{font-size:11px}
+.gt.sm th,.gt.sm td{padding:5px 7px}
+.gt.v{font-size:11px}
+.gt.v th,.gt.v td{padding:5px 6px;white-space:nowrap}
+.swatch{display:inline-block;width:11px;height:11px;border-radius:3px;border:1px solid rgba(22,24,29,.12);vertical-align:-1px;margin-right:5px}
+.legend{font-size:11px;color:#8b929c;font-family:"Cascadia Mono","Consolas",monospace;line-height:1.9}
+.rbox{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid #e6eaef;border-radius:8px;padding:8px 12px;font-size:12px;color:#5a6169;line-height:1.6}
+.rbox b{color:#16181d}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+ <symbol id="i-stack"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13.5 12 18.5l9-5"/></symbol>
+ <symbol id="i-grid"><rect x="3.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><rect x="3.4" y="13.4" width="7.2" height="7.2" rx="1.6"/><rect x="13.4" y="13.4" width="7.2" height="7.2" rx="1.6"/></symbol>
+ <symbol id="i-search"><circle cx="11" cy="11" r="6.2"/><path d="M20 20l-4.2-4.2"/></symbol>
+ <symbol id="i-cr"><path d="M9 6l6 6-6 6"/></symbol>
+ <symbol id="i-cd"><path d="M6 9l6 6 6-6"/></symbol>
+ <symbol id="i-hash"><path d="M9 4 7 20M17 4l-2 16M4 9h16M3 15h16"/></symbol>
+ <symbol id="i-code"><path d="M9 7 4 12l5 5M15 7l5 5-5 5"/></symbol>
+ <symbol id="i-lines"><path d="M4 6h16M4 12h11M4 18h14"/></symbol>
+ <symbol id="i-globe"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></symbol>
+ <symbol id="i-image"><rect x="3.4" y="4.4" width="17.2" height="15.2" rx="2"/><circle cx="8.4" cy="9.4" r="1.4"/><path d="M20.6 16.2l-4.6-4.6-6 6-2.6-2.6-4.4 4.4"/></symbol>
+ <symbol id="i-file"><path d="M13.5 3H7.5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M13.5 3v5h5"/></symbol>
+ <symbol id="i-clock"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+ <symbol id="i-copy"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></symbol>
+ <symbol id="i-aleft"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></symbol>
+ <symbol id="i-aright"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></symbol>
+ <symbol id="i-check"><path d="M5 12.5 10 17.5 19 7.5"/></symbol>
+ <symbol id="i-x"><path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/></symbol>
+ <symbol id="i-warn"><path d="M12 4 2.6 20h18.8L12 4Z"/><path d="M12 10v4.4M12 17.4v.2"/></symbol>
+ <symbol id="i-tab"><rect x="3.4" y="5.5" width="17.2" height="14.5" rx="2"/><path d="M3.4 9.5h17.2M9.5 9.5v10"/></symbol>
+</svg>
+<div class="page">
+
+<!-- ===================== 00 文档头 ===================== -->
+<section class="doc-head">
+ <h1><span class="idx">00</span>HTTP 批处理页 · 版式候选对比</h1>
+ <p>
+ 评审尺寸 <code>1266 x 763</code>（验收口径）/ 侧边栏固定 <code>268px</code> / 内容区 <code>998</code> → 减左右留白 48 → <b>可用宽 950</b>。
+ 本轮只比<b>版式</b>，不改信息架构；结论均落在算术上，不写「看起来更宽敞」。
+ 状态 <code>待用户拍板</code>。本页共 <code>10</code> 个编号区段（<code>00–09</code>）：00 文档头 + 01–09 正文。
+ </p>
+</section>
+
+<!-- ===================== 01 判定总览 ===================== -->
+<section>
+ <h2><span class="idx">01</span>判定总览 —— 先给结论（候选 × 指标矩阵）</h2>
+ <p class="lead">
+ 窗口 <code>1266 × 763</code>，可用宽 <code>950</code>（另注宽屏）。判定用 <b>inline SVG 对勾/叉图标 + 文字</b>（不使用 emoji）。
+ 五张候选的结论：<b>V1 不成立</b>（结果表缺 213px）、<b>V2 在 1266 下不成立</b>（缺 52px）、<b>V3 成立（基准）</b>、
+ <b>V4 成立（推荐）</b>、<b>V5 仅宽屏成立</b>。
+ </p>
+ <div class="tscroll">
+ <table class="gt v">
+ <thead>
+ <tr>
+ <th>候选</th><th>各栏宽</th><th>结果表可用宽<br>(≥ 520?)</th><th>执行条</th><th>请求行 URL 可用宽</th>
+ <th>输入区高</th><th>结果区高</th><th>结果表可见行</th><th>详情可见行</th><th>判定</th><th>成立的最小窗口宽</th><th>主要代价</th>
+ </tr>
+ </thead>
+ <tbody>
+ <tr>
+ <td><b>V1</b> 三栏等宽</td>
+ <td class="mono">307 / 307 / 307</td>
+ <td><span class="vb no"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>307</span><br><span class="em">缺 213</span>（套卡缺 245）</td>
+ <td><span class="vb no"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>3 行 / 124px</span></td>
+ <td><span class="vb no"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>149</span></td>
+ <td class="mono">并排(栏 653)</td><td class="mono">451</td><td class="n">11</td><td class="n">18</td>
+ <td><span class="vb no"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>不成立</span></td>
+ <td class="n">1904</td>
+ <td class="em">结果表横滚 213px；URL 149 连占位符都显示不全</td>
+ </tr>
+ <tr>
+ <td><b>V2</b> 两栏</td>
+ <td class="mono">468 / 468</td>
+ <td><span class="vb no"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>468</span><br><span class="em">缺 52</span></td>
+ <td><span class="vb warn"><svg class="ic ic-14 w" viewBox="0 0 24 24"><use href="#i-warn"/></svg>2 行 / 80px</span><br>余 7px</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>310</span></td>
+ <td class="mono">左栏 653 内</td><td class="mono">495</td><td class="n">12</td><td class="n">20</td>
+ <td><span class="vb no"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>不成立<br>(1266)</span></td>
+ <td class="n">1370</td>
+ <td class="em">结果表横滚 52px；执行条余量仅 7px</td>
+ </tr>
+ <tr>
+ <td><b>V3</b> 现状基准</td>
+ <td class="mono">上 468+468<br>下整宽 950</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>589</span><br>余 69</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>2 行 / 80px</span></td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>310</span></td>
+ <td class="mono">340</td><td class="mono">301</td><td class="n">6</td><td class="n">11</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>成立(基准)</span></td>
+ <td class="n">1252</td>
+ <td>配置态结果区仅 301px（6 行）</td>
+ </tr>
+ <tr>
+ <td><b>V4</b> 输入区页签</td>
+ <td class="mono">整宽 950<br>(页签切换)</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>589</span><br>余 69</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>1 行 / 36px</span></td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>792</span><br><span style="font-size:10.5px;color:#8b929c">可用；实绘输入框 790（差 2px = 卡片 2×1px 边框）</span></td>
+ <td class="mono">300</td><td class="mono">341</td><td class="n">7</td><td class="n">13</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>成立(推荐)</span></td>
+ <td class="n">1155</td>
+ <td>输入两块不能同屏，切换需点击</td>
+ </tr>
+ <tr>
+ <td><b>V5</b> 宽屏三栏</td>
+ <td class="mono">@1514 325/325/520<br>@1920 438/438/700</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>700</span><br>余 180</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>@1920 1 行</span></td>
+ <td><span class="vb warn"><svg class="ic ic-14 w" viewBox="0 0 24 24"><use href="#i-warn"/></svg>@1920 280</span><br><span class="em">@1514 167</span></td>
+ <td class="mono">并排(栏 653)</td><td class="mono">@1920 856</td><td class="n">22</td><td class="n">38</td>
+ <td><span class="vb ok"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>仅宽屏成立</span></td>
+ <td class="n">1993</td>
+ <td class="em">需 ≥1514 才成立；1920 下 URL 仍只有 280</td>
+ </tr>
+ </tbody>
+ </table>
+ </div>
+ <div class="legend" style="margin-top:8px;font-size:11px">
+ 说明：V3 / V4 的「结果表可见行」为<b>配置态</b>（输入区可见）；V5 行数为 @1920 全屏。<span class="vb no" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>= 不成立 / 超阈值</span>　<span class="vb ok" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>= 成立</span>　<span class="vb warn" style="font-size:11px"><svg class="ic ic-14 w" viewBox="0 0 24 24"><use href="#i-warn"/></svg>= 临界 / 需注意</span>
+ </div>
+ <div class="kv-tip">
+ <b>裁决一句话</b>：用户提的「横向三块」在 1266 这个尺寸上<b>在算术上不成立</b> —— 它没有消灭拥挤，只是把「<b>纵向被压</b>」换成了「<b>横向被压</b>」。
+ 但它的「松绑方向」是对的，落地方式是 <b>V4（输入区改页签、结果区仍整宽）</b>，而不是把结果区挤成三等分。
+ </div>
+ <div class="kv-tip">
+ <b>本页标注口径（写死，供量测核对）</b>
+ <table class="gt sm" style="max-width:1010px;margin:8px 0">
+ <thead><tr><th style="width:150px">项</th><th style="width:120px">名义（本页标注）</th><th style="width:130px">@1266 实测</th><th>差异来源</th></tr></thead>
+ <tbody>
+ <tr><td>V1 三栏宽</td><td class="n">307</td><td class="n">307.3</td><td><b>名义取整</b>：(950 − 28) ÷ 3 = 307.33 → 标 307</td></tr>
+ <tr><td>V2 / V3 卡内宽</td><td class="n">436</td><td class="n">434</td><td>名义 = 468 − 32；实测再扣<b>卡片 2×1px 边框</b></td></tr>
+ <tr><td>V4 卡内宽</td><td class="n">918</td><td class="n">916</td><td>名义 = 950 − 32；实测同因边框差 2px</td></tr>
+ <tr><td>V4 URL 可用宽</td><td class="n">792</td><td class="n">790</td><td>名义 = 卡内 918 − 118（方法）− 8（间距）；实测同因边框差 2px</td></tr>
+ <tr><td>V4 详情代码区高</td><td class="n">263</td><td class="n">245</td><td>名义 = 分栏 293 − 页签 30；实测再扣<b>分栏 2×1px 边框</b>与<b>代码区外边距 8px×2</b>（<code>.code-wrap{margin:8px}</code>，其 <code>padding</code> 为 0）</td></tr>
+ <tr><td>V4 详情可见行</td><td class="n">13</td><td class="n">12</td><td>名义 263 ÷ 20 = 13.15 → 13；实测 245 ÷ 20 = 12.25 → 12（<b>差 1 行 = 分栏边框 2 + 代码区外边距 16</b>）</td></tr>
+ </tbody>
+ </table>
+ ① 所有<b>栏宽 / 卡内宽一律取评估文档的名义值（整数）</b>，与实测的差异来源已逐项列在上表，只有三类：<b>「名义取整」</b>、<b>「卡片 / 分栏 2×1px 边框」</b>、<b>「代码区外边距 8px×2」</b>（仅详情行涉及）；除此之外不应再有未声明的差；
+ ② 图上<b>不再用「说明 chip」占据控件行宽度</b>（实测会把输入框挤窄 81px，造成标注与实绘不符）—— 说明一律走<b>绝对定位覆盖层</b>或<b>图下文字</b>；
+ ③ 行数换算（「分栏高」一律指<b>分栏外框高</b>，V4 = 293）：
+ <code>结果表 = (分栏高 − 表头 28) ÷ 34</code> —— V4 名义 <code>(293 − 28) = 265</code>、实测表体 <code>(291 − 28) = 263</code>（差 2px = 分栏 2×1px 边框），<code>265 ÷ 34 = 7.79</code> 与 <code>263 ÷ 34 = 7.74</code> <b>取整同为 7 行</b>；
+ <code>响应详情 = (分栏高 − 页签 30) ÷ 20</code> —— V4 <code>(293 − 30) ÷ 20 = 13.15 → 名义 13 行</code>，实测代码区再扣分栏 2×1px 边框 + 代码区外边距 16px = <code>245 ÷ 20 = 12.25 → 12 行</code>。均向下取整。
+ </div>
+</section>
+
+<!-- ===================== 02 为什么结果区必须整宽 ===================== -->
+<section>
+ <h2><span class="idx">02</span>为什么结果区必须整宽 —— 把算术摊开</h2>
+ <p class="lead">
+ 结果表不是「可大可小的一块」，它的最小宽由每条列的最小信息量加出来：<b>520px</b>。一旦把结果区切窄，缺的这段就只能靠<b>横向滚动</b>补 —— 而横向滚动比纵向滚动更难用（列头随之滚走）。
+ </p>
+
+ <h3 class="sub">结果表最小必需宽 = 520px 的来历（列宽尺，1:1）</h3>
+ <div class="colruler">
+ <div class="c fx" style="width:40px"><b>40</b>#</div>
+ <div class="c fx" style="width:62px"><b>62</b>状态</div>
+ <div class="c fx" style="width:68px"><b>68</b>耗时</div>
+ <div class="c el" style="width:150px"><b>150</b>地址</div>
+ <div class="c el" style="width:200px"><b>200</b>响应预览</div>
+ <div class="tot">= 520px</div>
+ </div>
+ <div class="legend" style="margin-top:6px;font-size:11px">
+ <span class="swatch" style="background:#f2f4f7;border-color:#d2d7de"></span>定宽列 170（<code># 40</code> + <code>状态 62</code> + <code>耗时 68</code>）
+ <span class="swatch" style="background:#eaf0fe;border-color:#b8cdfb;margin-left:14px"></span>弹性列下限 350（<code>地址 min 150</code> + <code>响应预览 min 200</code>）
+ </div>
+ <div class="kv-tip">
+ <b>算式</b>：<code>520 = 170（定宽：# 40 + 状态 62 + 耗时 68）+ 350（弹性下限：地址 min 150 + 响应预览 min 200）</code>。
+ 其中 <code>状态 62</code> 的来历是「<code>等待中</code>」三字 = <code>12.5 × 3 + 20 = 57.5</code> → 取 <b>62</b>（<b>56px 会截断成「等待…」</b>，这是上一轮验收已抓到的真实缺陷）。
+ </div>
+
+ <h3 class="sub">把 520 与各候选的实际可用宽并排比（1:1 比例条）</h3>
+ <div class="capbar">
+ <div class="row"><span class="lab">最小必需宽</span><span class="bar need" style="width:520px">520</span></div>
+ <div class="row"><span class="lab">V3 / V4 结果表可用</span><span class="bar ok" style="width:589px">589 ≥ 520（余 69）</span></div>
+ <div class="row"><span class="lab">V2 结果栏</span><span class="bar bad" style="width:468px">468</span><span class="gap">缺 52px</span></div>
+ <div class="row"><span class="lab">V1 结果表可用</span><span class="bar bad" style="width:307px">307</span><span class="gap">缺 213px</span></div>
+ </div>
+ <div class="legend" style="margin-top:6px;font-size:11px">横轴 1:1（1px = 1px）；V1 若把结果区套进卡片则只剩 275px → 缺 <b>245px</b>（两种口径都横滚，结论不变）。</div>
+
+ <div class="kv-tip" style="border-style:solid;background:#fdf1f1;border-color:#f0c4c4;margin-top:16px">
+ <b>结论</b>：把结果区压窄不是解决拥挤，而是把「<b>纵向被压</b>」换成「<b>横向被压</b>」——
+ <code>地址</code> 与 <code>响应预览</code> 会被推出视口，而它们正是判读结果的依据。
+ <b>横向与纵向是同一笔预算的两端</b>：结果区变窄，只是把「纵向看不见的行」换成「横向看不见的列」。
+ 因此结果区应当永远占<b>整幅内容宽（950）</b>，「省纵向」要靠在<b>输入区</b>做折叠 / 页签，而不是靠切窄结果区。
+ </div>
+</section>
+
+<!-- ===================== 03 图 V1 ===================== -->
+<section>
+ <h2><span class="idx">03</span>图 V1 · 横向三栏等宽（1266 × 763 真实尺寸，1:1） <span class="vb no" style="font-size:13px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>不成立</span></h2>
+ <p class="lead">
+ 按用户提案实绘：三栏等宽（<code>307 / 307 / 307</code>），第 1 栏请求模板、第 2 栏 CSV 数据、第 3 栏执行配置 + 执行结果。
+ 本图把问题<b>画出来</b>而不是只写文字 —— 第 3 栏的结果表右侧被推出两列、执行条涨到 3 行、URL 框只剩 149px。
+ </p>
+ <div class="wruler-row" style="width:1266px;padding:0 24px 0 292px"><i class="bad">307（实测 307.3）</i><i class="bad">307（实测 307.3）</i><i class="bad">307（实测 307.3）</i></div>
+ <div class="stage">
+  <div class="win">
+   <div class="sb">
+    <div class="brand"><span class="mk"><svg class="ic ic-16" viewBox="0 0 24 24"><use href="#i-stack"/></svg></span><span class="nm">ToolNest</span></div>
+    <div class="sb-all"><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-grid"/></svg>所有工具<span class="cnt">11</span></div>
+    <div class="sb-search"><span class="mag"><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-search"/></svg></span>搜索功能…</div>
+    <div class="sb-list">
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-hash"/></svg>转换类型工具<span class="cnt">2</span></div>
+     <div class="sb-kids"><div class="sb-kid"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>时间戳转换</div><div class="sb-kid"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>Cron 表达式解析</div></div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-code"/></svg>编码/解码类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-lines"/></svg>文本处理类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-globe"/></svg>网络请求类工具</div>
+     <div class="sb-kids"><div class="sb-kid on"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-globe"/></svg></span>HTTP 请求工具</div></div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-image"/></svg>图片处理类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-file"/></svg>文件处理类型工具</div>
+    </div>
+   </div>
+   <div class="cn">
+    <div class="pg-head">
+     <div class="crumb"><span class="back"><svg class="ic ic-16" viewBox="0 0 24 24"><use href="#i-aleft"/></svg></span>网络请求类工具 · HTTP 请求工具</div>
+     <div class="pg-title">HTTP 请求工具</div>
+    </div>
+    <div class="tabrow">
+     <div class="seg"><span class="it">单一请求</span><span class="it on">批处理</span></div>
+     <span class="sp"></span>
+     <span class="btn btn-secondary">用当前请求作为批处理模板</span>
+    </div>
+    <div class="vbody">
+     <!-- 栏 1 请求模板 -->
+     <div class="vcol fill">
+      <div class="card" style="flex:1">
+       <div class="card-head"><span class="card-title">请求模板</span><span class="card-cap">POST</span></div>
+       <div class="fld" style="margin-top:10px;gap:8px">
+        <span class="sel inp" style="flex:0 0 118px;width:118px;justify-content:space-between">POST<svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span>
+        <span class="inp grow ph mono" style="overflow:hidden">http://localhost:8999/us…</span>
+       </div>
+       <div style="margin-top:2px"><span class="tb">URL 仅 149px · 连占位符都显示不全</span></div>
+       <div class="fld" style="margin-top:8px"><span class="fldlab" style="flex:0 0 84px">请求体类型</span><span class="sel inp grow" style="justify-content:space-between">JSON<svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span></div>
+       <div class="ta" style="margin-top:8px;height:64px">{
+  "id": {id}
+}</div>
+       <div class="fld" style="margin-top:8px"><span class="fldlab" style="flex:0 0 84px">请求头</span><span class="inp grow ph">展开 2 行 …</span></div>
+       <div class="execbar r3">
+        <div class="exline"><span class="seg"><span class="it on">串行</span><span class="it">并发</span></span><span class="grp"><span class="olab">线程</span><span class="num"><span class="v">4</span></span></span></div>
+        <div class="exline"><span class="grp"><span class="olab">超时</span><span class="num"><span class="v">30</span></span><span class="unit">s</span></span><span class="grp"><span class="olab">间隔</span><span class="num"><span class="v">0</span></span><span class="unit">ms</span></span></div>
+        <div class="exline"><span class="btn btn-primary">开始执行</span><span class="btn btn-quiet">停止</span></div>
+       </div>
+       <div style="margin-top:6px"><span class="tb">执行条被迫 3 行 / 124px（比两行多 44px）</span></div>
+      </div>
+     </div>
+     <!-- 栏 2 CSV 数据 -->
+     <div class="vcol fill">
+      <div class="card" style="flex:1">
+       <div class="card-head"><span class="card-title">CSV 数据</span><span class="card-cap">4 列 · 24 行</span></div>
+       <div class="tblwrap" style="margin-top:10px;flex:1;border:1px solid var(--dt-border);border-radius:8px">
+        <table class="tbl" style="width:550px">
+         <colgroup><col style="width:40px"><col style="width:120px"><col style="width:150px"><col style="width:140px"><col style="width:100px"></colgroup>
+         <thead><tr><th>#</th><th>id</th><th>name</th><th>city</th><th>age</th></tr></thead>
+         <tbody>
+          <tr><td class="mono">1</td><td class="mono">3</td><td class="mono">user-3</td><td class="mono">Shanghai</td><td class="mono">5</td></tr>
+          <tr><td class="mono">2</td><td class="mono">4</td><td class="mono">user-4</td><td class="mono">Beijing</td><td class="mono">6</td></tr>
+          <tr><td class="mono">3</td><td class="mono">5</td><td class="mono">user-5</td><td class="mono">Shenzhen</td><td class="mono">7</td></tr>
+          <tr><td class="mono">4</td><td class="mono">6</td><td class="mono">user-6</td><td class="mono">Guangzhou</td><td class="mono">8</td></tr>
+          <tr><td class="mono">5</td><td class="mono">7</td><td class="mono">user-7</td><td class="mono">Hangzhou</td><td class="mono">9</td></tr>
+          <tr><td class="mono">6</td><td class="mono">8</td><td class="mono">user-8</td><td class="mono">Chengdu</td><td class="mono">10</td></tr>
+          <tr><td class="mono">7</td><td class="mono">9</td><td class="mono">user-9</td><td class="mono">Wuhan</td><td class="mono">11</td></tr>
+         </tbody>
+        </table>
+        <div style="position:absolute;top:0;bottom:0;right:0;width:16px;border-left:2px dashed #c33333;background:#fdeeee;opacity:.7;z-index:5"></div>
+        <div class="hbar"><i style="width:50%"></i></div>
+       </div>
+       <div style="margin-top:6px"><span class="tb">CSV 预览表 275px → 多列必然横滚</span></div>
+      </div>
+     </div>
+     <!-- 栏 3 执行配置 + 执行结果 -->
+     <div class="vcol fill">
+      <div class="card" style="flex:0 0 190px">
+       <div class="card-head"><span class="card-title">执行配置</span></div>
+       <div class="fld" style="margin-top:10px"><span class="fldlab" style="flex:0 0 60px">并发数</span><span class="num grow" style="height:28px"><span class="v">1</span></span></div>
+       <div class="fld" style="margin-top:8px"><span class="fldlab" style="flex:0 0 60px">失败重试</span><span class="num grow" style="height:28px"><span class="v">0</span></span></div>
+      </div>
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
+       <div class="rhead" style="border-bottom:0"><span class="rt">执行结果</span><span class="cnt">完成 24 / 24</span></div>
+       <div class="tblwrap" style="flex:1;border:1px solid var(--dt-border);border-radius:9px">
+        <table class="tbl" style="width:520px">
+         <colgroup><col style="width:40px"><col style="width:62px"><col style="width:68px"><col style="width:150px"><col style="width:200px"></colgroup>
+         <thead><tr><th>#</th><th>状态</th><th>耗时</th><th>地址</th><th>响应预览</th></tr></thead>
+         <tbody>
+          <tr><td class="mono">1</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/3</td><td class="mono">{&quot;age&quot;: 5, …}</td></tr>
+          <tr><td class="mono">2</td><td class="s-ok">200</td><td class="mono">6 ms</td><td class="mono">http://…/user/4</td><td class="mono">{&quot;age&quot;: 6, …}</td></tr>
+          <tr><td class="mono">3</td><td class="s-ok">200</td><td class="mono">8 ms</td><td class="mono">http://…/user/5</td><td class="mono">{&quot;age&quot;: 7, …}</td></tr>
+          <tr><td class="mono">4</td><td class="s-fail">500</td><td class="mono">7 ms</td><td class="mono">http://…/user/6</td><td class="mono">{&quot;error&quot;: …}</td></tr>
+          <tr><td class="mono">5</td><td class="s-ok">200</td><td class="mono">9 ms</td><td class="mono">http://…/user/7</td><td class="mono">{&quot;age&quot;: 9, …}</td></tr>
+          <tr><td class="mono">6</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/8</td><td class="mono">{&quot;age&quot;: 10, …}</td></tr>
+          <tr><td class="mono">7</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/9</td><td class="mono">{&quot;age&quot;: 11, …}</td></tr>
+          <tr><td class="mono">8</td><td class="s-ok">200</td><td class="mono">6 ms</td><td class="mono">http://…/user/10</td><td class="mono">{&quot;age&quot;: 12, …}</td></tr>
+          <tr><td class="mono">9</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/11</td><td class="mono">{&quot;age&quot;: 13, …}</td></tr>
+         </tbody>
+        </table>
+        <div style="position:absolute;top:0;bottom:0;right:0;width:18px;border-left:2px dashed #c33333;background:repeating-linear-gradient(45deg,#fdeeee 0 6px,#fff 6px 12px);z-index:5"></div>
+        <div class="hbar"><i style="width:59%"></i></div>
+       </div>
+       <div style="margin-top:4px"><span class="tb">结果表 307 &lt; 520 → 横滚 213px（地址 / 响应预览 被推出视口）</span></div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div class="ruler">
+   <div class="rh">尺寸标注 · 763</div>
+   <div class="rseg" style="height:62px">页头 62</div>
+   <div class="rseg" style="height:48px">页签行 48</div>
+   <div class="rseg hi" style="height:653px">三栏区 653（= 内容区全高）</div>
+  </div>
+ </div>
+ <div class="legend" style="margin-top:12px;font-size:11px">
+ 判定 <span class="vb no" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>不成立</span>（窗口需 ≥ 1904 才成立）：
+ ① 结果表可用 307 &lt; 520 → 横滚 213px（<b>口径：结果区不套卡，可用宽 307；若结果区套 16px 内边距则 245px</b>，两种都横滚）；
+ ② URL 只剩 149px（<code>http://localhost:8999/user/{id}</code> 显示不全）；
+ ③ 执行条 275 &lt; 429 → 被迫 3 行（124px，较两行 +44px）；④ CSV 预览表 275 → 多列横滚。
+ <b>本质</b>：纵向压力被搬到横向，一屏内「能看见」的信息总量反而下降。
+ </div>
+</section>
+
+<!-- ===================== 04 图 V2 ===================== -->
+<section>
+ <h2><span class="idx">04</span>图 V2 · 两栏（左＝请求模板 + CSV 叠 / 右＝执行配置 + 结果叠，1266 × 763 真实尺寸，1:1） <span class="vb no" style="font-size:13px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>不成立（1266 下）</span></h2>
+ <p class="lead">
+ 左栏上下叠请求模板与 CSV，右栏上下叠执行配置与结果；栏宽 <code>(950 − 14) ÷ 2 = 468</code>，卡内 436。
+ 右栏结果区 468 &lt; 520 → <b>结果表仍横滚 52px</b>。
+ </p>
+ <div class="wruler-row" style="width:1266px;padding:0 24px 0 292px"><i class="bad">468</i><i class="bad">468</i></div>
+ <div class="stage">
+  <div class="win">
+   <div class="sb">
+    <div class="brand"><span class="mk"><svg class="ic ic-16" viewBox="0 0 24 24"><use href="#i-stack"/></svg></span><span class="nm">ToolNest</span></div>
+    <div class="sb-all"><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-grid"/></svg>所有工具<span class="cnt">11</span></div>
+    <div class="sb-search"><span class="mag"><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-search"/></svg></span>搜索功能…</div>
+    <div class="sb-list">
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-hash"/></svg>转换类型工具<span class="cnt">2</span></div>
+     <div class="sb-kids"><div class="sb-kid"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>时间戳转换</div><div class="sb-kid"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>Cron 表达式解析</div></div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-code"/></svg>编码/解码类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-lines"/></svg>文本处理类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-globe"/></svg>网络请求类工具</div>
+     <div class="sb-kids"><div class="sb-kid on"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-globe"/></svg></span>HTTP 请求工具</div></div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-image"/></svg>图片处理类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-file"/></svg>文件处理类型工具</div>
+    </div>
+   </div>
+   <div class="cn">
+    <div class="pg-head">
+     <div class="crumb"><span class="back"><svg class="ic ic-16" viewBox="0 0 24 24"><use href="#i-aleft"/></svg></span>网络请求类工具 · HTTP 请求工具</div>
+     <div class="pg-title">HTTP 请求工具</div>
+    </div>
+    <div class="tabrow">
+     <div class="seg"><span class="it">单一请求</span><span class="it on">批处理</span></div>
+     <span class="sp"></span>
+     <span class="btn btn-secondary">用当前请求作为批处理模板</span>
+    </div>
+    <div class="vbody">
+     <!-- 左栏：请求模板(252) + CSV(389) -->
+     <div class="vcol fill" style="gap:12px">
+      <div class="card" style="flex:0 0 252px">
+       <div class="card-head"><span class="card-title">请求模板</span><span class="card-cap">POST</span></div>
+       <div class="fld" style="margin-top:10px;gap:8px">
+        <span class="sel inp h36" style="flex:0 0 118px;width:118px;justify-content:space-between">POST<svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span>
+        <span class="inp h36 grow mono">http://localhost:8999/user/{id}</span>
+       </div>
+       <div class="fld" style="margin-top:10px"><span class="fldlab">请求体类型</span><span class="sel inp grow" style="justify-content:space-between">JSON<svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span></div>
+       <div class="fld" style="margin-top:10px;align-items:flex-start"><span class="fldlab">请求体</span><div class="ta grow" style="height:56px;min-width:0">{
+  "id": {id}
+}</div></div>
+      </div>
+      <div class="card" style="flex:1">
+       <div class="card-head"><span class="card-title">CSV 数据</span><span class="card-cap">4 列 · 24 行</span></div>
+       <div class="tblwrap" style="margin-top:10px;flex:1;border:1px solid var(--dt-border);border-radius:8px">
+        <table class="tbl" style="width:436px">
+         <colgroup><col style="width:36px"><col style="width:70px"><col style="width:120px"><col style="width:110px"><col style="width:100px"></colgroup>
+         <thead><tr><th>#</th><th>id</th><th>name</th><th>city</th><th>age</th></tr></thead>
+         <tbody>
+          <tr><td class="mono">1</td><td class="mono">3</td><td class="mono">user-3</td><td class="mono">Shanghai</td><td class="mono">5</td></tr>
+          <tr><td class="mono">2</td><td class="mono">4</td><td class="mono">user-4</td><td class="mono">Beijing</td><td class="mono">6</td></tr>
+          <tr><td class="mono">3</td><td class="mono">5</td><td class="mono">user-5</td><td class="mono">Shenzhen</td><td class="mono">7</td></tr>
+          <tr><td class="mono">4</td><td class="mono">6</td><td class="mono">user-6</td><td class="mono">Guangzhou</td><td class="mono">8</td></tr>
+          <tr><td class="mono">5</td><td class="mono">7</td><td class="mono">user-7</td><td class="mono">Hangzhou</td><td class="mono">9</td></tr>
+          <tr><td class="mono">6</td><td class="mono">8</td><td class="mono">user-8</td><td class="mono">Chengdu</td><td class="mono">10</td></tr>
+          <tr><td class="mono">7</td><td class="mono">9</td><td class="mono">user-9</td><td class="mono">Wuhan</td><td class="mono">11</td></tr>
+         </tbody>
+        </table>
+        <div class="hbar"><i style="width:70%"></i></div>
+       </div>
+      </div>
+     </div>
+     <!-- 右栏：执行配置(148) + 结果(495) -->
+     <div class="vcol fill" style="gap:12px">
+      <div class="card" style="flex:0 0 148px">
+       <div class="card-head"><span class="card-title">执行配置</span></div>
+       <div class="fld" style="margin-top:10px;gap:8px"><span class="grp" style="display:flex;align-items:center;gap:4px"><span class="olab" style="font-size:11px;color:var(--dt-text-muted)">线程</span><span class="num" style="flex:0 0 64px;height:28px"><span class="v">4</span></span></span><span class="grp" style="display:flex;align-items:center;gap:4px"><span class="olab" style="font-size:11px;color:var(--dt-text-muted)">超时</span><span class="num" style="flex:0 0 64px;height:28px"><span class="v">30</span></span></span></div>
+       <div style="margin-top:6px"><span class="tb warn">执行条卡内 436（实绘 434）装两行 429 → 余量 5–7px，极紧</span></div>
+      </div>
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
+       <div class="rhead"><span class="rt">执行结果</span><span class="cnt">完成 24 / 24</span><span class="stat">成功 <span class="ok">23</span>&nbsp;&nbsp;失败 <span class="bad">1</span></span><span class="sp"></span><span class="btn btn-secondary h28">导出 CSV</span></div>
+       <div class="tblwrap" style="flex:1;border:1px solid var(--dt-border);border-radius:9px">
+        <table class="tbl" style="width:520px">
+         <colgroup><col style="width:40px"><col style="width:62px"><col style="width:68px"><col style="width:150px"><col style="width:200px"></colgroup>
+         <thead><tr><th>#</th><th>状态</th><th>耗时</th><th>地址</th><th>响应预览</th></tr></thead>
+         <tbody>
+          <tr><td class="mono">1</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/3</td><td class="mono">{&quot;age&quot;: 5, …}</td></tr>
+          <tr><td class="mono">2</td><td class="s-ok">200</td><td class="mono">6 ms</td><td class="mono">http://…/user/4</td><td class="mono">{&quot;age&quot;: 6, …}</td></tr>
+          <tr><td class="mono">3</td><td class="s-ok">200</td><td class="mono">8 ms</td><td class="mono">http://…/user/5</td><td class="mono">{&quot;age&quot;: 7, …}</td></tr>
+          <tr><td class="mono">4</td><td class="s-fail">500</td><td class="mono">7 ms</td><td class="mono">http://…/user/6</td><td class="mono">{&quot;error&quot;: …}</td></tr>
+          <tr><td class="mono">5</td><td class="s-ok">200</td><td class="mono">9 ms</td><td class="mono">http://…/user/7</td><td class="mono">{&quot;age&quot;: 9, …}</td></tr>
+          <tr><td class="mono">6</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/8</td><td class="mono">{&quot;age&quot;: 10, …}</td></tr>
+          <tr><td class="mono">7</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/9</td><td class="mono">{&quot;age&quot;: 11, …}</td></tr>
+          <tr><td class="mono">8</td><td class="s-ok">200</td><td class="mono">6 ms</td><td class="mono">http://…/user/10</td><td class="mono">{&quot;age&quot;: 12, …}</td></tr>
+          <tr><td class="mono">9</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/11</td><td class="mono">{&quot;age&quot;: 13, …}</td></tr>
+          <tr><td class="mono">10</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/12</td><td class="mono">{&quot;age&quot;: 14, …}</td></tr>
+          <tr><td class="mono">11</td><td class="s-ok">200</td><td class="mono">8 ms</td><td class="mono">http://…/user/13</td><td class="mono">{&quot;age&quot;: 15, …}</td></tr>
+          <tr><td class="mono">12</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://…/user/14</td><td class="mono">{&quot;age&quot;: 16, …}</td></tr>
+         </tbody>
+        </table>
+        <div style="position:absolute;top:0;bottom:0;right:0;width:18px;border-left:2px dashed #c33333;background:repeating-linear-gradient(45deg,#fdeeee 0 6px,#fff 6px 12px);z-index:5"></div>
+        <div class="hbar"><i style="width:90%"></i></div>
+       </div>
+       <div style="margin-top:2px"><span class="tb">结果栏 468 &lt; 520 → 横滚 52px（响应预览尾部被切）</span></div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div class="ruler">
+   <div class="rh">尺寸标注 · 763</div>
+   <div class="rseg" style="height:62px">页头 62</div>
+   <div class="rseg" style="height:48px">页签行 48</div>
+   <div class="rseg hi" style="height:653px">两栏区 653</div>
+  </div>
+ </div>
+ <div class="legend" style="margin-top:12px;font-size:11px">
+ 判定 <span class="vb no" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>不成立（1266 下）</span>（窗口需 ≥ 1370）：
+ ① 右栏 468 &lt; 520 → 结果表横滚 52px；② 执行条在右栏卡内 <b>436（实绘 434）</b>，行 2 需 429 → <b>余量仅 5–7px</b>，任何标签变长即破；③ CSV 预览表 436（与现状同级）。
+ <br><b>更正一处口径 —— 三个数字并列（不再用「两卡合计」这种含糊说法）</b>：
+ <table class="gt sm" style="max-width:860px;margin:8px 0">
+ <thead><tr><th style="width:130px">口径</th><th style="width:150px">数值</th><th>构成</th></tr></thead>
+ <tbody>
+ <tr><td>左栏<b>可用高</b></td><td class="n">653</td><td>@1266 本图实测渲染值（内容区 763 − chrome 110）</td></tr>
+ <tr><td>两卡<b>下限合计</b></td><td class="n">512</td><td>请求模板 252 + 间距 12 + CSV 卡下限 248（预览表压到 min 120）</td></tr>
+ <tr><td>两卡<b>期望高合计</b></td><td class="n">653</td><td>请求模板 252 + 间距 12 + CSV 389（预览表 261 ≈ 6 行）</td></tr>
+ </tbody>
+ </table>
+ <b>裁定</b>：期望高合计 <b>653 = 可用高 653</b> → <b>期望高恰好用满，无挤压</b>；下限合计 512 远小于可用 653，更无挤压；CSV 预览拿到 389 − 128 = 261px（≈ 6 行）。
+ 因此<b>不要</b>说「左栏两张卡被挤压」—— 763 高度下<b>不成立</b>。该挤压结论<b>只在窗口高 &lt; ~640px 时才成立</b>（(640 − 110) = 530 &lt; 期望 653，但 ≥ 下限 512，此时只是「预览表被压到下限」而非「卡被挤坏」）。
+ </div>
+</section>
+
+<!-- ===================== 05 图 V3 ===================== -->
+<section>
+ <h2><span class="idx">05</span>图 V3 · 现状基准（上输入双栏 + 下结果整宽，1266 × 763 真实尺寸，骨架级 1:1） <span class="vb ok" style="font-size:13px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>成立（基准）</span></h2>
+ <p class="lead">
+ 不必重画细节 —— 画<b>骨架级</b>：各段高度 <code>62 / 48 / 340 / 12 / 301</code> 与关键控件位置。结果区整宽 → 分栏左栏 589 ≥ 520 不横滚。
+ <span class="note">完整 1:1 呈现见 <code>design/http-batch-redesign.html</code> 第 <code>03</code> 节。</span>
+ </p>
+ <div class="wruler-row" style="width:1266px;padding:0 24px 0 292px"><i class="ok">468（请求模板）</i><i class="ok">468（CSV 数据）</i></div>
+ <div class="stage">
+  <div class="win">
+   <div style="flex:0 0 268px;width:268px;background:var(--dt-canvas);border-right:1px solid var(--dt-border);display:flex;align-items:center;justify-content:center;color:#8b929c;font-size:12px">侧边栏 268</div>
+   <div class="cn">
+    <div class="sblk b-chrome" style="height:62px;flex:0 0 62px">页头（面包屑 + 23px 标题）<span class="px">62</span></div>
+    <div class="sblk b-chrome2" style="height:48px;flex:0 0 48px">页签行（胶囊页签 + 右置 carryOver 按钮）<span class="px">48</span></div>
+    <div style="flex:1;min-height:0;padding:0 24px;display:flex;flex-direction:column;gap:12px">
+     <div class="b-inp" style="height:340px;flex:0 0 340px;display:flex;gap:14px;padding:12px;border-radius:9px">
+      <div style="flex:1;background:#fff;border:1px solid #d2d7de;border-radius:8px;display:flex;flex-direction:column;padding:12px">
+       <div class="sblk" style="padding:0;color:#5a6169"><b style="color:#16181d">请求模板</b><span class="px">卡内 436</span></div>
+       <div class="sblk" style="margin-top:8px;height:36px;background:#f8f9fb;border:1px solid #d2d7de;border-radius:8px">[方法 118] [地址 310]（强调档 36）</div>
+       <div class="sblk" style="margin-top:8px;height:32px;background:#f8f9fb;border:1px solid #d2d7de;border-radius:8px">请求体类型 32</div>
+       <div class="sblk" style="margin-top:8px;flex:1;background:#f8f9fb;border:1px solid #d2d7de;border-radius:8px">请求体</div>
+       <div class="sblk" style="margin-top:8px;height:80px;border-top:1px dashed #d2d7de;color:#2563eb">执行条 · 两行 80px（行 1 = 225 / 行 2 = 428，卡内 436 装下，余 8px）<span class="px">80</span></div>
+      </div>
+      <div style="flex:1;background:#fff;border:1px solid #d2d7de;border-radius:8px;display:flex;flex-direction:column;padding:12px">
+       <div class="sblk" style="padding:0;color:#5a6169"><b style="color:#16181d">CSV 数据</b><span class="px">卡内 436</span></div>
+       <div class="sblk" style="margin-top:8px;flex:1;background:#f8f9fb;border:1px solid #d2d7de;border-radius:8px">CSV 预览表 436 → 净 184px ≈ 5 行可见</div>
+      </div>
+     </div>
+     <div class="b-res" style="flex:1;min-height:0;padding:12px;border-radius:9px;display:flex;flex-direction:column;gap:8px">
+      <div class="sblk" style="padding:0">结果区 · VGrow 独占剩余高度 <span class="px">301</span></div>
+      <div style="flex:1;background:#fff;border:1px solid #d2d7de;border-radius:8px;display:flex;overflow:hidden">
+       <div class="sblk" style="flex:0 0 62%;border-right:1px solid #d2d7de;align-items:flex-start;padding-top:10px">结果分栏 · 左栏 <b>589 ≥ 520</b> 不横滚（结果表 6 行）</div>
+       <div class="sblk" style="flex:1;align-items:flex-start;padding-top:10px">响应详情 11 行</div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div class="ruler">
+   <div class="rh">尺寸标注 · 763</div>
+   <div class="rseg" style="height:62px">页头 62</div>
+   <div class="rseg" style="height:48px">页签行 48</div>
+   <div class="rseg hi" style="height:340px">输入 340</div>
+   <div class="rseg" style="height:12px">12</div>
+   <div class="rseg hi" style="height:301px">结果 301</div>
+  </div>
+ </div>
+ <div class="legend" style="margin-top:12px;font-size:11px">
+ 判定 <span class="vb ok" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>成立（基准）</span>：
+ 结果分栏左栏 <b>589 ≥ 520</b>（余 69）不横滚；输入两块同屏可编辑；已验证（QA 24 条 PASS）。
+ 代价：配置态结果区仅 <b>301px</b> → 结果表 <b>6 行</b>、详情 <b>11 行</b>；要更大结果区只能折叠输入区（运行态可到 15 / 25 行）。
+ <br><b>综合阈值 1252</b>（<code>1155</code> 只是<b>结果表</b>阈值；V3 另有「执行条维持两行、卡内需 ≥ 429」这条约束，其阈值 1252）—— 验收尺寸 1266 <b>恰好只高过它 14px</b>，这也解释了执行条两行余量为何这么紧。
+ </div>
+</section>
+
+<!-- ===================== 06 图 V4 ===================== -->
+<section>
+ <h2><span class="idx">06</span>图 V4 · 输入区改内层页签（整宽 950，1266 × 763 真实尺寸，1:1） <span class="vb ok" style="font-size:13px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>成立（推荐）</span></h2>
+ <p class="lead">
+ 输入工作区 <code>300px</code> ＝ 内层页签条「请求模板 | CSV 数据」（文字 + 2px 主色下划线，与外层胶囊页签形态不同）+ 面板；
+ 结果区 <code>341px</code>（比 V3 多 40px）→ 结果表 <b>7 行</b> / 详情 <b>13 行</b>；执行条回到<b>单行 36px</b>；CSV 预览表整宽不横滚。
+ </p>
+ <div class="wruler-row" style="width:1266px;padding:0 24px 0 292px"><i class="ok">950（输入整宽 · 结果整宽）</i></div>
+ <div class="stage">
+  <div class="win">
+   <div class="sb">
+    <div class="brand"><span class="mk"><svg class="ic ic-16" viewBox="0 0 24 24"><use href="#i-stack"/></svg></span><span class="nm">ToolNest</span></div>
+    <div class="sb-all"><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-grid"/></svg>所有工具<span class="cnt">11</span></div>
+    <div class="sb-search"><span class="mag"><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-search"/></svg></span>搜索功能…</div>
+    <div class="sb-list">
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-hash"/></svg>转换类型工具<span class="cnt">2</span></div>
+     <div class="sb-kids"><div class="sb-kid"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>时间戳转换</div><div class="sb-kid"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>Cron 表达式解析</div></div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-code"/></svg>编码/解码类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-lines"/></svg>文本处理类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-globe"/></svg>网络请求类工具</div>
+     <div class="sb-kids"><div class="sb-kid on"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-globe"/></svg></span>HTTP 请求工具</div></div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-image"/></svg>图片处理类型工具</div>
+     <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-file"/></svg>文件处理类型工具</div>
+    </div>
+   </div>
+   <div class="cn">
+    <div class="pg-head">
+     <div class="crumb"><span class="back"><svg class="ic ic-16" viewBox="0 0 24 24"><use href="#i-aleft"/></svg></span>网络请求类工具 · HTTP 请求工具</div>
+     <div class="pg-title">HTTP 请求工具</div>
+    </div>
+    <div class="tabrow">
+     <div class="seg"><span class="it">单一请求</span><span class="it on">批处理</span></div>
+     <span class="sp"></span>
+     <span class="btn btn-secondary">用当前请求作为批处理模板</span>
+    </div>
+    <div class="vbody" style="flex-direction:column;gap:12px">
+     <!-- 输入工作区 300 -->
+     <div class="card" style="flex:0 0 300px;height:300px;padding:16px;position:relative">
+      <div class="itabs" style="flex:0 0 30px;height:30px"><span class="itab on">请求模板</span><span class="itab">CSV 数据</span></div>
+      <div style="height:8px;flex:0 0 8px"></div>
+      <div class="fld" style="height:36px;flex:0 0 36px;gap:8px">
+       <span class="sel inp h36" style="flex:0 0 118px;width:118px;justify-content:space-between">POST<svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span>
+       <span class="inp h36 grow mono">http://localhost:8999/user/{id}</span>
+      </div>
+      <div style="height:8px;flex:0 0 8px"></div>
+      <div class="fld" style="height:32px;flex:0 0 32px"><span class="fldlab">请求体类型</span><span class="sel inp grow" style="justify-content:space-between">JSON<svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span></div>
+      <div style="height:8px;flex:0 0 8px"></div>
+      <div class="fld" style="height:64px;flex:0 0 64px;align-items:flex-start"><span class="fldlab">请求体</span><div class="ta grow" style="height:64px">{
+  "id": {id}
+}</div></div>
+      <div style="height:8px;flex:0 0 8px"></div>
+      <div class="fld" style="height:30px;flex:0 0 30px"><span class="fldlab">请求头</span><span class="inp h30 grow ph" style="height:30px">展开 2 行 …</span></div>
+      <div style="height:8px;flex:0 0 8px"></div>
+      <div class="execbar r1" style="margin-top:0">
+       <div class="exline"><span class="seg"><span class="it on">串行</span><span class="it">并发</span></span><span class="grp"><span class="olab">线程</span><span class="num"><span class="v">4</span></span></span><span class="grp"><span class="olab">超时</span><span class="num"><span class="v">30</span></span><span class="unit">s</span></span><span class="grp"><span class="olab">间隔</span><span class="num"><span class="v">0</span></span><span class="unit">ms</span></span><span class="btn btn-primary">开始执行</span><span class="btn btn-quiet">停止</span></div>
+      </div>
+      <div class="anno" style="right:16px;top:5px;z-index:9"><span class="tb ok">执行条单行 36px：内容 664 ≤ 卡内 918 <svg class="vs vok" viewBox="0 0 24 24"><use href="#i-check"/></svg>（相对两行省 44px）</span></div>
+     </div>
+     <!-- 结果区 341 -->
+     <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;position:relative">
+      <div class="rhead"><span class="rt">执行结果</span><span class="cnt">完成 24 / 24</span><span class="prog"><i style="width:100%"></i></span><span class="stat">成功 <span class="ok">23</span>&nbsp;&nbsp;失败 <span class="bad">1</span>&nbsp;&nbsp;平均 7 ms</span><span class="sp"></span><span class="btn btn-secondary h28">导出结果 CSV</span><span class="tb">结果区 341</span></div>
+      <div class="split" style="flex:1">
+       <div class="L">
+        <div class="tblwrap">
+         <table class="tbl">
+          <colgroup><col style="width:40px"><col style="width:62px"><col style="width:68px"><col style="width:194px"><col style="width:224px"></colgroup>
+          <thead><tr><th>#</th><th>状态</th><th>耗时</th><th>地址</th><th>响应预览</th></tr></thead>
+          <tbody>
+           <tr><td class="mono">1</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/3</td><td class="mono">{&quot;age&quot;: 5, &quot;city&quot;: &quot;5&quot;, …}</td></tr>
+           <tr><td class="mono">2</td><td class="s-ok">200</td><td class="mono">6 ms</td><td class="mono">http://localhost:8999/user/4</td><td class="mono">{&quot;age&quot;: 6, &quot;city&quot;: &quot;6&quot;, …}</td></tr>
+           <tr><td class="mono">3</td><td class="s-ok">200</td><td class="mono">8 ms</td><td class="mono">http://localhost:8999/user/5</td><td class="mono">{&quot;age&quot;: 7, &quot;city&quot;: &quot;7&quot;, …}</td></tr>
+           <tr><td class="mono">4</td><td class="s-fail">500</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/6</td><td class="mono">{&quot;error&quot;: &quot;Internal Server Error&quot;}</td></tr>
+           <tr><td class="mono">5</td><td class="s-ok">200</td><td class="mono">9 ms</td><td class="mono">http://localhost:8999/user/7</td><td class="mono">{&quot;age&quot;: 9, &quot;city&quot;: &quot;9&quot;, …}</td></tr>
+           <tr><td class="mono">6</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/8</td><td class="mono">{&quot;age&quot;: 10, &quot;city&quot;: &quot;10&quot;, …}</td></tr>
+           <tr><td class="mono">7</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/9</td><td class="mono">{&quot;age&quot;: 11, &quot;city&quot;: &quot;11&quot;, …}</td></tr>
+           <tr><td class="mono">8</td><td class="s-ok">200</td><td class="mono">6 ms</td><td class="mono">http://localhost:8999/user/10</td><td class="mono">{&quot;age&quot;: 12, &quot;city&quot;: &quot;12&quot;, …}</td></tr>
+          </tbody>
+         </table>
+        </div>
+       </div>
+       <div class="bar"></div>
+       <div class="R">
+        <div class="itabs" style="margin:0 8px"><span class="itab on">响应体</span><span class="itab">响应头</span><span class="itab">请求</span><span class="itab">变量</span></div>
+        <div class="code-wrap" style="margin:8px">
+         <span class="btn btn-quiet h28 copy">复制</span>
+         <div class="code">{
+  <span class="k">&quot;age&quot;</span>: <span class="n">5</span>,
+  <span class="k">&quot;city&quot;</span>: <span class="s">&quot;5&quot;</span>,
+  <span class="k">&quot;area&quot;</span>: <span class="n">6</span>,
+  <span class="k">&quot;id&quot;</span>: <span class="n">3</span>
+}</div>
+        </div>
+       </div>
+      </div>
+      <div class="anno" style="right:12px;bottom:8px;z-index:9"><span class="tb">结果分栏左栏 589 ≥ 520 <svg class="vs vok" viewBox="0 0 24 24"><use href="#i-check"/></svg> 不横滚（结果表 7 行 / 详情 13 行）</span></div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div class="ruler">
+   <div class="rh">尺寸标注 · 763</div>
+   <div class="rseg" style="height:62px">页头 62</div>
+   <div class="rseg" style="height:48px">页签行 48</div>
+   <div class="rseg hi" style="height:300px">输入 300</div>
+   <div class="rseg" style="height:12px">12</div>
+   <div class="rseg hi" style="height:341px">结果 341</div>
+  </div>
+ </div>
+
+ <div class="kv-tip" style="margin-top:16px">
+ <b>输入区 300px 的精确构成（可复核）</b>：<code>内边距 16 + 内层页签条 30 + 间距 8 + 请求行 36 + 间距 8 + 请求体类型行 32 + 间距 8 + 请求体 64 + 间距 8 + 请求头 30 + 间距 8 + 执行条（单行）36 + 内边距 16 = 300</code>。
+ 结果区 <code>341 = 763 − 110（chrome） − 12（间距） − 300（输入）</code>。净省 40px 的来源：执行条两行 → 单行省 44px，叠加「卡头条 34 → 页签条 30（−4）」与「新增一条间距（+8）」，<b>净省 40px</b> —— 正是结果区 301 → 341 多出的那 40px。
+ <br><b>行数实测口径（可复核）</b>：结果表 <code>(293 − 28) ÷ 34 = 7.79 → 7 整行 + 第 8 行半露</code>（实测 tblwrap 291）；
+ 详情 <code>名义 (293 − 30) ÷ 20 = 13 行</code>，<code>实测代码区 245 ÷ 20 = 12 行</code>（差 1 行 = 分栏 2×1px 边框 + 代码区外边距 8px×2 = 18px）。口径见 §01「本页标注口径」。
+ </div>
+
+ <h3 class="sub">内嵌：输入区切到「CSV 数据」页签（输入区仍 300px，CSV 预览表整宽 950 → 多列不横滚）</h3>
+ <div class="wruler-row" style="width:950px;padding:0"><i class="ok">950（CSV 预览表整宽）</i></div>
+ <div style="width:950px;border:1px solid var(--dt-border);border-radius:11px;padding:16px;height:300px;display:flex;flex-direction:column;background:var(--dt-surface)">
+  <div class="itabs" style="flex:0 0 30px;height:30px"><span class="itab">请求模板</span><span class="itab on">CSV 数据</span></div>
+  <div class="tblwrap" style="margin-top:8px;flex:1;border:1px solid var(--dt-border);border-radius:8px">
+   <table class="tbl">
+    <colgroup><col style="width:48px"><col style="width:120px"><col style="width:230px"><col style="width:210px"><col style="width:150px"><col style="width:160px"></colgroup>
+    <thead><tr><th>#</th><th>id</th><th>name</th><th>email</th><th>city</th><th>age</th></tr></thead>
+    <tbody>
+     <tr><td class="mono">1</td><td class="mono">3</td><td class="mono">user-3</td><td class="mono">u3@toolnest.dev</td><td class="mono">Shanghai</td><td class="mono">5</td></tr>
+     <tr><td class="mono">2</td><td class="mono">4</td><td class="mono">user-4</td><td class="mono">u4@toolnest.dev</td><td class="mono">Beijing</td><td class="mono">6</td></tr>
+     <tr><td class="mono">3</td><td class="mono">5</td><td class="mono">user-5</td><td class="mono">u5@toolnest.dev</td><td class="mono">Shenzhen</td><td class="mono">7</td></tr>
+     <tr><td class="mono">4</td><td class="mono">6</td><td class="mono">user-6</td><td class="mono">u6@toolnest.dev</td><td class="mono">Guangzhou</td><td class="mono">8</td></tr>
+     <tr><td class="mono">5</td><td class="mono">7</td><td class="mono">user-7</td><td class="mono">u7@toolnest.dev</td><td class="mono">Hangzhou</td><td class="mono">9</td></tr>
+     <tr><td class="mono">6</td><td class="mono">8</td><td class="mono">user-8</td><td class="mono">u8@toolnest.dev</td><td class="mono">Chengdu</td><td class="mono">10</td></tr>
+    </tbody>
+   </table>
+   <div class="hbar"><i style="width:100%"></i></div>
+  </div>
+ </div>
+
+ <div class="legend" style="margin-top:12px;font-size:11px">
+ 判定 <span class="vb ok" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>成立（推荐）</span>：成立最小窗宽 <b>1155</b>（四项里最低），结果表 589 ≥ 520、执行条回单行、CSV 整宽不横滚。
+ <b>代价</b>：<b>输入两块不能同屏</b> —— 请求模板与 CSV 数据需点击切换（配置态看不到「模板 + CSV 预览」并排的对照关系），多一次点击。
+ </div>
+</section>
+
+<!-- ===================== 07 图 V5 ===================== -->
+<section>
+ <h2><span class="idx">07</span>图 V5 · 宽屏三栏 1fr / 1fr / 1.6fr（1920 × 1080 真实尺寸，1:1） <span class="vb ok" style="font-size:13px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>仅宽屏成立</span></h2>
+ <p class="lead">
+ 1920 全屏下 <code>438 / 438 / 700</code>；结果栏 <b>700 ≥ 520</b> <svg class="vs vok" viewBox="0 0 24 24"><use href="#i-check"/></svg>，但栏 1 的 URL 只有 <b>280 &lt; 300</b>（真瓶颈）。
+ <b>1920 宽超出评审页容器</b>，故把画布放进可横向滚动的容器里 —— <b>不缩放画布</b>。
+ </p>
+ <div class="legend" style="margin-bottom:8px;font-size:11px">1920 × 1080 1:1，容器内横向滚动查看（画布不缩放）。</div>
+ <div class="hscroll">
+  <div class="wruler-row" style="width:1920px;padding:0 24px 0 292px"><i class="ok">438</i><i class="ok">438</i><i class="ok">700（结果栏 ≥ 520 <svg class="vs vok" viewBox="0 0 24 24"><use href="#i-check"/></svg>）</i></div>
+  <div class="stage">
+   <div class="win win--wide">
+    <div class="sb">
+     <div class="brand"><span class="mk"><svg class="ic ic-16" viewBox="0 0 24 24"><use href="#i-stack"/></svg></span><span class="nm">ToolNest</span></div>
+     <div class="sb-all"><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-grid"/></svg>所有工具<span class="cnt">11</span></div>
+     <div class="sb-search"><span class="mag"><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-search"/></svg></span>搜索功能…</div>
+     <div class="sb-list">
+      <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-hash"/></svg>转换类型工具<span class="cnt">2</span></div>
+      <div class="sb-kids"><div class="sb-kid"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>时间戳转换</div><div class="sb-kid"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>Cron 表达式解析</div></div>
+      <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-code"/></svg>编码/解码类型工具</div>
+      <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-lines"/></svg>文本处理类型工具</div>
+      <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-globe"/></svg>网络请求类工具</div>
+      <div class="sb-kids"><div class="sb-kid on"><span class="kic"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-globe"/></svg></span>HTTP 请求工具</div></div>
+      <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-image"/></svg>图片处理类型工具</div>
+      <div class="sb-folder"><span class="car"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cr"/></svg></span><svg class="ic ic-15" viewBox="0 0 24 24"><use href="#i-file"/></svg>文件处理类型工具</div>
+     </div>
+    </div>
+    <div class="cn">
+     <div class="pg-head">
+      <div class="crumb"><span class="back"><svg class="ic ic-16" viewBox="0 0 24 24"><use href="#i-aleft"/></svg></span>网络请求类工具 · HTTP 请求工具</div>
+      <div class="pg-title">HTTP 请求工具</div>
+     </div>
+     <div class="tabrow">
+      <div class="seg"><span class="it">单一请求</span><span class="it on">批处理</span></div>
+      <span class="sp"></span>
+      <span class="btn btn-secondary">用当前请求作为批处理模板</span>
+     </div>
+     <div class="vbody">
+      <!-- 栏 1 请求模板 438 -->
+      <div class="vcol" style="flex:0 0 438px;width:438px">
+       <div class="card" style="flex:1">
+        <div class="card-head"><span class="card-title">请求模板</span><span class="card-cap">POST</span></div>
+        <div class="fld" style="margin-top:10px;gap:8px">
+         <span class="sel inp h36" style="flex:0 0 118px;width:118px;justify-content:space-between">POST<svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span>
+         <span class="inp h36 grow mono" style="overflow:hidden">http://localhost:8999/u…</span>
+        </div>
+        <div style="margin-top:2px"><span class="tb warn">URL 仅 280 &lt; 300（真瓶颈，需窗口 ≥ 1993）</span></div>
+        <div class="fld" style="margin-top:8px"><span class="fldlab">请求体类型</span><span class="sel inp grow" style="justify-content:space-between">JSON<svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-cd"/></svg></span></div>
+        <div class="ta" style="margin-top:8px;height:64px">{
+  "id": {id}
+}</div>
+        <div class="fld" style="margin-top:8px"><span class="fldlab">请求头</span><span class="inp h30 grow ph" style="height:30px">展开 2 行 …</span></div>
+        <div class="execbar r1" style="margin-top:8px"><div class="exline"><span class="seg"><span class="it on">串行</span><span class="it">并发</span></span><span class="grp"><span class="olab">线程</span><span class="num"><span class="v">4</span></span></span><span class="grp"><span class="olab">超时</span><span class="num"><span class="v">30</span></span></span></div></div>
+       </div>
+      </div>
+      <!-- 栏 2 CSV 438 -->
+      <div class="vcol" style="flex:0 0 438px;width:438px">
+       <div class="card" style="flex:1">
+        <div class="card-head"><span class="card-title">CSV 数据</span><span class="card-cap">4 列 · 24 行</span></div>
+        <div class="tblwrap" style="margin-top:10px;flex:1;border:1px solid var(--dt-border);border-radius:8px">
+         <table class="tbl" style="width:436px">
+          <colgroup><col style="width:36px"><col style="width:70px"><col style="width:120px"><col style="width:110px"><col style="width:100px"></colgroup>
+          <thead><tr><th>#</th><th>id</th><th>name</th><th>city</th><th>age</th></tr></thead>
+          <tbody>
+           <tr><td class="mono">1</td><td class="mono">3</td><td class="mono">user-3</td><td class="mono">Shanghai</td><td class="mono">5</td></tr>
+           <tr><td class="mono">2</td><td class="mono">4</td><td class="mono">user-4</td><td class="mono">Beijing</td><td class="mono">6</td></tr>
+           <tr><td class="mono">3</td><td class="mono">5</td><td class="mono">user-5</td><td class="mono">Shenzhen</td><td class="mono">7</td></tr>
+           <tr><td class="mono">4</td><td class="mono">6</td><td class="mono">user-6</td><td class="mono">Guangzhou</td><td class="mono">8</td></tr>
+           <tr><td class="mono">5</td><td class="mono">7</td><td class="mono">user-7</td><td class="mono">Hangzhou</td><td class="mono">9</td></tr>
+           <tr><td class="mono">6</td><td class="mono">8</td><td class="mono">user-8</td><td class="mono">Chengdu</td><td class="mono">10</td></tr>
+           <tr><td class="mono">7</td><td class="mono">9</td><td class="mono">user-9</td><td class="mono">Wuhan</td><td class="mono">11</td></tr>
+          </tbody>
+         </table>
+        </div>
+        <div style="margin-top:6px"><span class="tb">CSV 406（与 V3 同级）</span></div>
+       </div>
+      </div>
+      <!-- 栏 3 执行配置 + 结果 700 -->
+      <div class="vcol" style="flex:1">
+       <div class="card" style="flex:0 0 100px">
+        <div class="card-head"><span class="card-title">执行配置</span><span class="card-cap">单行执行条 · 内容 664 ≤ 668</span></div>
+       </div>
+       <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
+        <div class="rhead"><span class="rt">执行结果</span><span class="cnt">完成 24 / 24</span><span class="prog"><i style="width:100%"></i></span><span class="stat">成功 <span class="ok">23</span>&nbsp;&nbsp;失败 <span class="bad">1</span></span><span class="sp"></span><span class="btn btn-secondary h28">导出结果 CSV</span></div>
+        <div class="split" style="flex:1">
+         <div class="L">
+          <div class="tblwrap">
+           <table class="tbl">
+            <colgroup><col style="width:40px"><col style="width:62px"><col style="width:68px"><col style="width:194px"><col style="width:224px"></colgroup>
+            <thead><tr><th>#</th><th>状态</th><th>耗时</th><th>地址</th><th>响应预览</th></tr></thead>
+            <tbody>
+             <tr><td class="mono">1</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/3</td><td class="mono">{&quot;age&quot;: 5, &quot;city&quot;: &quot;5&quot;, …}</td></tr>
+             <tr><td class="mono">2</td><td class="s-ok">200</td><td class="mono">6 ms</td><td class="mono">http://localhost:8999/user/4</td><td class="mono">{&quot;age&quot;: 6, &quot;city&quot;: &quot;6&quot;, …}</td></tr>
+             <tr><td class="mono">3</td><td class="s-ok">200</td><td class="mono">8 ms</td><td class="mono">http://localhost:8999/user/5</td><td class="mono">{&quot;age&quot;: 7, &quot;city&quot;: &quot;7&quot;, …}</td></tr>
+             <tr><td class="mono">4</td><td class="s-fail">500</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/6</td><td class="mono">{&quot;error&quot;: &quot;Internal Server Error&quot;}</td></tr>
+             <tr><td class="mono">5</td><td class="s-ok">200</td><td class="mono">9 ms</td><td class="mono">http://localhost:8999/user/7</td><td class="mono">{&quot;age&quot;: 9, &quot;city&quot;: &quot;9&quot;, …}</td></tr>
+             <tr><td class="mono">6</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/8</td><td class="mono">{&quot;age&quot;: 10, &quot;city&quot;: &quot;10&quot;, …}</td></tr>
+             <tr><td class="mono">7</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/9</td><td class="mono">{&quot;age&quot;: 11, &quot;city&quot;: &quot;11&quot;, …}</td></tr>
+             <tr><td class="mono">8</td><td class="s-ok">200</td><td class="mono">6 ms</td><td class="mono">http://localhost:8999/user/10</td><td class="mono">{&quot;age&quot;: 12, &quot;city&quot;: &quot;12&quot;, …}</td></tr>
+             <tr><td class="mono">9</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/11</td><td class="mono">{&quot;age&quot;: 13, &quot;city&quot;: &quot;13&quot;, …}</td></tr>
+             <tr><td class="mono">10</td><td class="s-ok">200</td><td class="mono">7 ms</td><td class="mono">http://localhost:8999/user/12</td><td class="mono">{&quot;age&quot;: 14, &quot;city&quot;: &quot;14&quot;, …}</td></tr>
+            </tbody>
+           </table>
+          </div>
+         </div>
+         <div class="bar"></div>
+         <div class="R">
+          <div class="itabs" style="margin:0 8px"><span class="itab on">响应体</span><span class="itab">响应头</span><span class="itab">请求</span><span class="itab">变量</span></div>
+          <div class="code-wrap" style="margin:8px"><span class="btn btn-quiet h28 copy">复制</span><div class="code">{
+  <span class="k">&quot;age&quot;</span>: <span class="n">5</span>,
+  <span class="k">&quot;city&quot;</span>: <span class="s">&quot;5&quot;</span>,
+  <span class="k">&quot;id&quot;</span>: <span class="n">3</span>
+}</div></div>
+         </div>
+        </div>
+        <div style="margin-top:2px"><span class="tb ok">结果栏 700 ≥ 520（余 180）· 结果表 @1920 22 行 / 详情 38 行</span></div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+   <div class="ruler">
+    <div class="rh">尺寸标注 · 1080</div>
+    <div class="rseg" style="height:62px">页头 62</div>
+    <div class="rseg" style="height:48px">页签行 48</div>
+    <div class="rseg hi" style="height:970px">三栏区 970</div>
+   </div>
+  </div>
+ </div>
+
+ <h3 class="sub">建议比例 1.2 / 1 / 1.4 的效果对比（@1920，同一 950 → 1604 可用宽）</h3>
+ <table class="gt sm" style="max-width:900px">
+ <thead><tr><th>比例</th><th>栏 1 请求模板</th><th>栏 2 CSV</th><th>结果栏</th><th>栏 1 URL</th><th>结果表 ≥ 520?</th></tr></thead>
+ <tbody>
+ <tr><td class="mono">1 / 1 / 1.6</td><td class="n">438</td><td class="n">438</td><td class="n">700</td><td class="n em">280 <svg class="vs vno" viewBox="0 0 24 24"><use href="#i-x"/></svg></td><td class="ok"><svg class="vs vok" viewBox="0 0 24 24"><use href="#i-check"/></svg> 余 180</td></tr>
+ <tr><td class="mono">1.2 / 1 / 1.4</td><td class="n">525</td><td class="n">438</td><td class="n">613</td><td class="n ok">367 <svg class="vs vok" viewBox="0 0 24 24"><use href="#i-check"/></svg></td><td class="ok"><svg class="vs vok" viewBox="0 0 24 24"><use href="#i-check"/></svg> 余 93</td></tr>
+ </tbody>
+ </table>
+ <div class="kv-tip">
+ <b>结论</b>：V5 的真瓶颈在 <b>URL 不在结果表</b> —— 1/1/1.6 下结果栏 700 很舒服，但栏 1 URL 只有 280。若做 V5，<b>建议改 1.2 / 1 / 1.4</b>（栏 1 变大、结果栏仍 ≥ 520）。
+ 另注：需新增断点 <b>1514</b>（结果表不横滚）/ <b>1993</b>（URL ≥ 300）；笔记本（1366×768 / 1440×900）落在阈值以下，会退化成 V1 的横滚问题。
+ </div>
+ <div class="kv-tip" style="border-style:solid;background:#fdf6ec;border-color:#f0dcb8;margin-top:12px">
+ <b>执行条的口径缺口 —— 这条比阈值本身更该先定</b>：本图实绘的执行条<b>只在第 1 栏</b>（各栏枚数 1 / 0 / 0）。
+ 第 1 栏内宽 @1920 只有 <b>406 &lt; 664</b>（执行条单行所需），所以 <b>1920 时执行条仍要 3 行</b>；
+ 按「执行条留在第 1 栏」重算，它不增行的窗口阈值高达 <b>≈2857</b>。
+ <br><b>建议</b>：V5 应把执行条<b>提为横贯整宽的执行带</b>（与 1266 方案里的处理思路一致）——
+ 这样执行条拿到 1576 − 32 = <b>1544 ≥ 664</b>，单行成立，V5 的阈值才回到 <b>1514</b>（结果表不横滚）/ <b>1993</b>（URL ≥ 300）。
+ </div>
+</section>
+
+<!-- ===================== 08 阈值与隐患 ===================== -->
+<section>
+ <h2><span class="idx">08</span>阈值与隐患</h2>
+ <p class="lead">
+ 「成立的最小窗口宽（综合）」= <code>max(结果表不横滚 ∧ 执行条不增行 ∧ URL ≥ 300)</code>。三张子阈值摊开如下，另登记一处 <code>v5</code> 未覆盖的口径缺口。
+ </p>
+
+ <h3 class="sub">三张子阈值表（解出的窗口宽）</h3>
+ <table class="gt">
+ <thead><tr><th>候选</th><th>① 结果表不横滚<br>(结果栏 ≥ 520)</th><th>② 执行条不增行</th><th>③ URL ≥ 300</th><th class="mono">综合 = max</th><th>判定</th></tr></thead>
+ <tbody>
+ <tr><td><b>V1</b></td><td class="n">1904</td><td class="n">1727</td><td class="n">1718</td><td class="n em">1904</td><td><span class="vb no" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>1266 远不够</span></td></tr>
+ <tr><td><b>V2</b></td><td class="n">1370</td><td class="n">1252</td><td class="n">≈1250</td><td class="n em">1370</td><td><span class="vb no" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-x"/></svg>1266 不够</span></td></tr>
+ <tr><td><b>V3</b></td><td class="n">1155</td><td class="n">1252</td><td class="n">≈1250</td><td class="n">1252</td><td><span class="vb ok" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>1266 仅高 14px</span></td></tr>
+ <tr><td><b>V4</b></td><td class="n">1155</td><td class="n">1012</td><td class="n">774</td><td class="n ok">1155</td><td><span class="vb ok" style="font-size:11px"><svg class="ic ic-14" viewBox="0 0 24 24"><use href="#i-check"/></svg>富余最大</span></td></tr>
+ <tr><td><b>V5</b></td><td class="n">1514</td><td class="n">≈2857</td><td class="n">1993</td><td class="n">1993</td><td><span class="vb warn" style="font-size:11px"><svg class="ic ic-14 w" viewBox="0 0 24 24"><use href="#i-warn"/></svg>仅超宽屏</span></td></tr>
+ </tbody>
+ </table>
+ <div class="legend" style="margin-top:8px;font-size:11px">
+ ① 结果表：<code>结果栏 ≥ 520</code>；② 执行条：卡内 ≥ 429（单行则 ≥ 664）；③ URL：请求行内 ≥ 426（URL ≥ 300）。
+ <br><b>② 栏 V2 / V3 由 1232 更正为 ≈1250</b>：原式漏计 <b>14px 栏间距</b>与 <b>2×1px 卡片边框</b> —— 卡宽 ≥ 458 + 2 = 460 → <code>(w − 316 − 14) ÷ 2 ≥ 460</code> → <b>w ≥ 1250</b>。
+ <br><b>② 栏 V5 由 1910 更正为 ≈2857</b>：本图实绘执行条<b>只在第 1 栏</b>（各栏枚数 1 / 0 / 0），按「执行条留在第 1 栏」重算 —— 单行需第 1 栏内宽 ≥ 664 → 栏宽 k ≥ 664 + 34 = 698 → <code>w = 3.6k + 344 ≥ 2856.8</code> → <b>≈2857</b>。
+ 未采纳改进前 max = 2857；<b>采纳「执行条提为横贯整宽执行带」后</b> ② 不再受栏 1 宽度约束（≈1012），综合回到 <b>1993</b>（= max(1514, 1993)），与 §01 矩阵一致。
+ </div>
+
+ <div class="kv-tip" style="border-style:solid;background:#fdf6ec;border-color:#f0dcb8">
+ <b>关键提醒：V3 的综合阈值是 1252，不是 1155。</b>
+ <code>1155</code> 只是<b>结果表</b>的阈值；V3 另有「执行条要维持两行、卡内需 ≥ 429」这条约束，其阈值是 <b>1252</b>。
+ 验收尺寸 1266 <b>恰好只高过它 14px</b> —— 这也解释了 v5 里执行条两行的 7px 余量为什么这么紧。
+ </div>
+
+ <div class="kv-tip" style="border-style:solid;background:#fdf1f1;border-color:#f0c4c4">
+ <b>隐患 · v5 漏项（1024 窗口）</b>：v5 未声明 1024 下执行条的换行口径。
+ 1024 窗口时输入卡 = <code>(756 − 48 − 14) ÷ 2 = 347</code> → 卡内 <b>315 &lt; 429</b>，执行条被迫 <b>3 行（+44px）</b>，会进一步压缩结果区。
+ <b>处理</b>：建议后续在实现口径里补一条，或把执行条改为「窄窗自动换行」的规则 —— <span class="vb warn" style="font-size:11px"><svg class="ic ic-14 w" viewBox="0 0 24 24"><use href="#i-warn"/></svg>需要后续补进实现口径</span>。
+ </div>
+</section>
+
+<!-- ===================== 09 待你拍板 ===================== -->
+<section>
+ <h2><span class="idx">09</span>待你拍板</h2>
+ <p class="lead">四条取舍 —— <b>P1 是唯一必须由你点头的前提</b>（V4 成立的前提），其余三条可后续再定。</p>
+ <table class="gt">
+ <thead><tr><th style="width:44px">#</th><th style="width:230px">问题</th><th>选项</th><th style="width:230px">建议</th><th style="width:250px">影响</th></tr></thead>
+ <tbody>
+ <tr>
+ <td class="mono">P1</td>
+ <td>输入区能否改为「请求模板 / CSV 数据」<b>页签切换</b>（V4 的前提）</td>
+ <td>① 接受切换（换 7 行结果 + 单行执行条 + CSV 整宽）<br>② 坚持两块同屏（保持 V3，结果 6 行）</td>
+ <td class="ok">① —— 批处理本身是「先配模板 → 再导 CSV」的顺序流程，切换与流程同构；收益是实打实的 +1 行 / +2 行</td>
+ <td>选 ① 则 1266 下结果区 301 → <b>341</b>；选 ② 则维持 V3 的 6 行</td>
+ </tr>
+ <tr>
+ <td class="mono">P2</td>
+ <td>是否为宽屏新增 <b>V5 断点（≥1514）</b></td>
+ <td>① 加断点<br>② 只做 V4，宽屏也只是「更宽的结果区」</td>
+ <td class="ok">② —— 断点意味着两套版式要各自验收，成本不小；V4 在 1920 下同样受益。除非明确要三栏并列</td>
+ <td>选 ① 需新增 1514 / 1993 两条断点与两套验收</td>
+ </tr>
+ <tr>
+ <td class="mono">P3</td>
+ <td>若做 V5，比例用 <code>1/1/1.6</code> 还是 <code>1.2/1/1.4</code></td>
+ <td>① 1/1/1.6（结果栏 700，栏 1 仅 438 → URL 280）<br>② 1.2/1/1.4（栏 1 变大，结果栏仍 ≥ 520）</td>
+ <td class="ok">② —— V5 的真瓶颈在 URL 不在结果表</td>
+ <td>选 ② 栏 1 URL 280 → <b>367</b>；结果栏 700 → 613（仍 ≥ 520）</td>
+ </tr>
+ <tr>
+ <td class="mono">P4</td>
+ <td>1024 下执行条接受 <b>3 行</b>还是另想办法</td>
+ <td>① 接受 3 行<br>② 窄窗把执行条改为「参数收进抽屉」</td>
+ <td class="ok">① 先接受；若实测挤压明显再做 ②</td>
+ <td>选 ① 1024 下结果区再让出 44px</td>
+ </tr>
+ </tbody>
+ </table>
+ <div class="kv-tip">
+ <b>推荐落地</b>：日常窗口（<code>1266×763</code>）用 <b>V4</b>；若你坚持「输入两块必须同屏」，则保持 <b>V3</b>。
+ 两者结果表都不横滚（589 ≥ 520）；V4 只是用「输入区多一次点击」换「结果区 +40px」。宽屏（≥1514）若要做，用 <b>V5 + 1.2/1/1.4</b>。
+ </div>
+</section>
+
+</div>
+</body>
+</html>
